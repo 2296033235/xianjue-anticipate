@@ -100,7 +100,6 @@ QTableWidget {
     color: #D0D0D5;
     border: 1px solid rgba(80, 80, 100, 60);
     border-radius: 4px;
-    grid-line-color: rgba(80, 80, 100, 30);
 }
 QHeaderView::section {
     background-color: rgba(255, 255, 255, 10);
@@ -457,6 +456,21 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(trigger_group)
 
+        # Language group.
+        lang_group = QGroupBox("Language")
+        lang_layout = QHBoxLayout(lang_group)
+
+        lang_layout.addWidget(QLabel("Direction:"))
+        self._lang_pair_combo = QComboBox()
+        self._lang_pair_combo.addItems(["EN -> ZH (English to Chinese)", "ZH -> EN (Chinese to English)"])
+        saved_pair = self._config_get("language.pair", "en_zh")
+        self._lang_pair_combo.setCurrentIndex(1 if saved_pair == "zh_en" else 0)
+        self._lang_pair_combo.currentIndexChanged.connect(self._on_lang_pair_changed)
+        lang_layout.addWidget(self._lang_pair_combo)
+
+        lang_layout.addStretch()
+        layout.addWidget(lang_group)
+
         # Engine group.
         engine_group = QGroupBox("Translation Engine")
         engine_layout = QVBoxLayout(engine_group)
@@ -515,6 +529,16 @@ class MainWindow(QMainWindow):
         self._slider.setValue(values[index])
         self._length_input.setText(str(values[index]))
         self._config_set("trigger_length", values[index])
+
+    def _on_lang_pair_changed(self, index: int) -> None:
+        pair = "en_zh" if index == 0 else "zh_en"
+        self._config_set("language.pair", pair)
+        if index == 0:
+            self._config_set("language.source", "auto")
+            self._config_set("language.target", "zh")
+        else:
+            self._config_set("language.source", "auto")
+            self._config_set("language.target", "en")
 
     def _on_slider_changed(self, value: int) -> None:
         self._length_input.setText(str(value))
