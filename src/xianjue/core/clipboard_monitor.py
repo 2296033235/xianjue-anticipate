@@ -91,6 +91,7 @@ class ClipboardMonitor:
             try:
                 current = pyperclip.paste()
             except Exception:
+                print(f"[clipboard] paste error")
                 time.sleep(self._poll_interval)
                 continue
 
@@ -112,6 +113,7 @@ class ClipboardMonitor:
             self._suppress_next = False
 
             if not current or not current.strip():
+                print("[clipboard] empty, skipping")
                 time.sleep(self._poll_interval)
                 continue
 
@@ -126,19 +128,23 @@ class ClipboardMonitor:
             # Check trigger length (user-configurable).
             trigger_length = self._config_get("trigger_length", 30)
             if len(raw.strip()) < trigger_length:
+                print(f"[clipboard] too short ({len(raw.strip())} < {trigger_length})")
                 time.sleep(self._poll_interval)
                 continue
 
             # Cap at 500 chars for MVP (long text -> manual mode).
             if len(raw.strip()) > 500:
+                print(f"[clipboard] too long, truncating to 500")
                 raw = raw.strip()[:500]
 
             if should_skip(raw):
+                print(f"[clipboard] intent filter rejected: {raw.strip()[:50]}")
                 time.sleep(self._poll_interval)
                 continue
 
             repaired = repair(raw)
             if not repaired:
+                print("[clipboard] repair returned empty")
                 time.sleep(self._poll_interval)
                 continue
 
@@ -146,4 +152,3 @@ class ClipboardMonitor:
             self._on_text(raw, repaired)
 
             time.sleep(self._poll_interval)
-

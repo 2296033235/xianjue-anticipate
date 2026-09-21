@@ -56,6 +56,7 @@ class XianJueApp:
     def _on_translation_result(self, result, source_text: str) -> None:
         """Called from the pipeline thread; must be on the main thread."""
         QTimer.singleShot(0, lambda: self.floating_window.show_translation(result, source_text))
+        print(f"[app] marshalling to main thread: {result.translation[:40]}")
 
     def _toggle_floating(self) -> None:
         if self.floating_window.isVisible():
@@ -81,4 +82,3 @@ class XianJueApp:
 def create_app() -> XianJueApp:
     import sys
     return XianJueApp(sys.argv)
-
