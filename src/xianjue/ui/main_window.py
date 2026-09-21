@@ -524,7 +524,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(float_group)
 
         # UI Language group.
-        ui_lang_group = QGroupBox("UI Language (界面语言)")
+        ui_lang_group = QGroupBox("系统语言")
         ui_lang_layout = QHBoxLayout(ui_lang_group)
         ui_lang_layout.addWidget(QLabel("Language:"))
         self._ui_lang_combo = QComboBox()

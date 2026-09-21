@@ -18,7 +18,7 @@ from PySide6.QtCore import Qt, QTimer, QPoint, Signal, QRectF
 from PySide6.QtGui import QColor, QPainter, QPainterPath, QBrush, QPen, QCursor, QIcon, QPixmap
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QTextBrowser, QSizePolicy, QApplication, QComboBox,
+    QTextBrowser, QSizePolicy, QApplication,
 )
 
 from ..providers.base import TranslationResult
@@ -142,23 +142,6 @@ class FloatingWindow(QWidget):
         self._pin_btn.setToolTip("Pin: keep window visible")
         self._pin_btn.clicked.connect(self._toggle_pin)
         top_bar.addWidget(self._pin_btn)
-
-        # Language switcher (source -> target).
-        self._lang_combo = QComboBox()
-        self._lang_combo.addItems(["EN -> ZH", "ZH -> EN"])
-        self._lang_combo.setFixedHeight(22)
-        self._lang_combo.setStyleSheet(
-            "QComboBox { background: rgba(255,255,255,20); color: rgba(200,200,210,180);"
-            " border: none; border-radius: 3px; font-size: 11px; padding: 0px 4px; }"
-            "QComboBox QAbstractItemView { background: #2A2A30; color: #D0D0D8;"
-            " selection-background-color: rgba(70,130,220,80); }"
-        )
-        # Restore last selection.
-        saved_lang = self._config_get("language.pair", "en_zh")
-        if saved_lang == "zh_en":
-            self._lang_combo.setCurrentIndex(1)
-        self._lang_combo.currentIndexChanged.connect(self._on_lang_changed)
-        top_bar.addWidget(self._lang_combo)
 
         self._density_btn = QPushButton("detail" if self._density == "compact" else "simple")
         self._density_btn.setObjectName("controlBtn")
@@ -323,17 +306,6 @@ class FloatingWindow(QWidget):
         self._density_btn.setText("simple" if show_detail else "detail")
         # Force recalc.
         self.adjustSize()
-
-    def _on_lang_changed(self, index: int) -> None:
-        """Update target language in config so the pipeline routes correctly."""
-        pair = "en_zh" if index == 0 else "zh_en"
-        self._config_set("language.pair", pair)
-        if index == 0:
-            self._config_set("language.source", "auto")
-            self._config_set("language.target", "zh")
-        else:
-            self._config_set("language.source", "auto")
-            self._config_set("language.target", "en")
 
     # --- drag ----------------------------------------------------------------
 
