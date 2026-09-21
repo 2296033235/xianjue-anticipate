@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-_DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent / "config" / "default_config.json"
+_DEFAULT_PATH = Path(__file__).resolve().parent.parent.parent.parent / "config" / "default_config.json"
 _USER_PATH = Path.home() / ".xianjue" / "config.json"
 
 
@@ -76,4 +76,3 @@ class Config:
     @property
     def data(self) -> dict:
         return self._data.copy()
-
