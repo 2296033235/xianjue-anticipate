@@ -145,10 +145,6 @@ class MainWindow(QMainWindow):
         # UI language: read once, labels are built in the chosen language.
         self._lang = config("ui.language", "zh")
 
-    def _tr(self, text: str) -> str:
-        """Translate a UI label using the configured language."""
-        return _tr(text, self._lang)
-
         central = QWidget()
         self.setCentralWidget(central)
         main_layout = QHBoxLayout(central)
@@ -199,6 +195,10 @@ class MainWindow(QMainWindow):
 
         # Default page.
         self._navigate("dashboard")
+
+    def _tr(self, text: str) -> str:
+        """Translate a UI label using the configured language."""
+        return _tr(text, self._lang)
 
     # --- navigation -----------------------------------------------------------
 
