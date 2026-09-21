@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction
-from PySide6.QtWidgets import QApplication, QMainWindow, QLabel, QWidget, QVBoxLayout
+from PySide6.QtCore import QTimer
+from PySide6.QtWidgets import QApplication
 
 from .core.config import Config
 from .core.pipeline import TranslationPipeline
+from .models.database import Database
 from .providers.factory import create_provider
 from .ui.floating_window import FloatingWindow
 from .ui.tray import TrayIcon
+from .ui.main_window import MainWindow
 
 
 class XianJueApp:
@@ -25,6 +26,7 @@ class XianJueApp:
         self.config = Config()
         self.config_get = self.config.get
         self.config_set = self.config.set
+        self.db = Database()
 
         self._build_components()
 
@@ -43,10 +45,19 @@ class XianJueApp:
             on_result=self._on_translation_result,
         )
 
+        # Main window.
+        self.main_window = MainWindow(
+            config=self.config_get,
+            config_set=self.config_set,
+            on_translate_manual=self._on_manual_translate,
+            db=self.db,
+        )
+
         # Tray.
         self.tray = TrayIcon(config_get=self.config_get)
         self.tray.toggle_floating.connect(self._toggle_floating)
         self.tray.toggle_pause.connect(self._set_paused)
+        self.tray.open_main.connect(self._show_main)
         self.tray.quit_app.connect(self._quit)
         self.tray.setVisible(True)
 
@@ -57,6 +68,19 @@ class XianJueApp:
         """Called from the pipeline thread; must be on the main thread."""
         QTimer.singleShot(0, lambda: self.floating_window.show_translation(result, source_text))
         print(f"[app] shown in floating window ({len(result.translation)} chars)")
+
+    def _on_manual_translate(self, text: str, source_lang: str, target_lang: str) -> None:
+        """Manual translation from the main window."""
+        import threading
+        from .core.text_repair import repair
+
+        def worker():
+            repaired = repair(text)
+            result = self.provider.translate(repaired, source_lang, target_lang, detailed=True)
+            self.db.add_history(repaired, result.translation, source_lang, target_lang, result.engine)
+            QTimer.singleShot(0, lambda: self.main_window.show_manual_result(result, repaired))
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _toggle_floating(self) -> None:
         if self.floating_window.isVisible():
@@ -71,8 +95,14 @@ class XianJueApp:
         self.pipeline.paused = paused
         self.tray.set_paused(paused)
 
+    def _show_main(self) -> None:
+        self.main_window.show()
+        self.main_window.raise_()
+        self.main_window.refresh_all()
+
     def _quit(self) -> None:
         self.pipeline.stop()
+        self.db.close()
         self.qt_app.quit()
 
     def run(self) -> int:
