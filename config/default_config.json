@@ -1,0 +1,42 @@
+{
+  "trigger_length": 30,
+  "trigger_presets": {
+    "sensitive": 10,
+    "balanced": 30,
+    "conservative": 100
+  },
+  "floating_window": {
+    "auto_hide_seconds": 8,
+    "hover_pause_countdown": true,
+    "density": "compact",
+    "hover_show_original": true,
+    "show_original_section": false,
+    "pinned": false
+  },
+  "language": {
+    "source": "auto",
+    "target": "zh"
+  },
+  "model": {
+    "provider": "cloud",
+    "cloud": {
+      "service": "deepseek",
+      "api_key": "",
+      "model": "deepseek-chat"
+    },
+    "local": {
+      "host": "http://localhost:11434",
+      "model": "qwen3.5:9b",
+      "think": false
+    }
+  },
+  "learning": {
+    "daily_new_words": 15,
+    "wordbook": null
+  },
+  "focus_mode": true,
+  "startup": {
+    "auto_start": false
+  }
+}
+
