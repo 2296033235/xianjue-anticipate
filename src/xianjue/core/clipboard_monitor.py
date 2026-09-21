@@ -138,7 +138,7 @@ class ClipboardMonitor:
                 raw = raw.strip()[:500]
 
             if should_skip(raw):
-                print(f"[clipboard] intent filter rejected: {raw.strip()[:50]}")
+                print(f"[clipboard] intent filter rejected: {raw.strip()[:40]}")
                 time.sleep(self._poll_interval)
                 continue
 

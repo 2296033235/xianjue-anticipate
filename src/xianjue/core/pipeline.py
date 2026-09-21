@@ -110,7 +110,7 @@ class TranslationPipeline:
 
         # Run translation in a background thread.
         def _do_translate():
-            print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:50]}")
+            print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:80]}...")
             # Quick mode for the floating window (fast, plain translation).
             result = self._provider.translate(repaired, source_lang, target_lang, detailed=False)
             # Only deliver if no newer request has been made.
@@ -123,7 +123,7 @@ class TranslationPipeline:
                     # Evict oldest (dict preserves insertion order).
                     first_key = next(iter(self._last_translation_cache))
                     del self._last_translation_cache[first_key]
-                print(f"[pipeline] delivering: {result.translation[:50]}")
+                print(f"[pipeline] done: {len(result.translation)} chars, {result.latency:.2f}s")
                 self._on_result(result, repaired)
 
         threading.Thread(target=_do_translate, daemon=True).start()
