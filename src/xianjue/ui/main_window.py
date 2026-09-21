@@ -343,6 +343,10 @@ class MainWindow(QMainWindow):
             )
             self._translate_result.setPlainText(result.translation + terms_text)
 
+    def show_manual_error(self, error: str) -> None:
+        """Called when manual translation fails."""
+        self._translate_result.setPlainText(f"Error: {error}")
+
     # --- vocabulary ---------------------------------------------------------------
 
     def _build_vocabulary_page(self) -> QWidget:
@@ -519,6 +523,18 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(float_group)
 
+        # UI Language group.
+        ui_lang_group = QGroupBox("UI Language (界面语言)")
+        ui_lang_layout = QHBoxLayout(ui_lang_group)
+        ui_lang_layout.addWidget(QLabel("Language:"))
+        self._ui_lang_combo = QComboBox()
+        self._ui_lang_combo.addItems(["中文 (Chinese)", "English"])
+        self._ui_lang_combo.setCurrentIndex(0 if self._config_get("ui.language", "zh") == "zh" else 1)
+        self._ui_lang_combo.currentIndexChanged.connect(self._on_ui_lang_changed)
+        ui_lang_layout.addWidget(self._ui_lang_combo)
+        ui_lang_layout.addStretch()
+        layout.addWidget(ui_lang_group)
+
         layout.addStretch()
         return scroll
 
@@ -526,7 +542,7 @@ class MainWindow(QMainWindow):
 
     def _on_preset_changed(self, index: int) -> None:
         values = [10, 30, 100]
-        self._slider.setValue(values[index])
+        self._trigger_slider.setValue(values[index])
         self._length_input.setText(str(values[index]))
         self._config_set("trigger_length", values[index])
 
@@ -543,6 +559,10 @@ class MainWindow(QMainWindow):
     def _on_slider_changed(self, value: int) -> None:
         self._length_input.setText(str(value))
         self._config_set("trigger_length", value)
+
+    def _on_ui_lang_changed(self, index: int) -> None:
+        new_lang = "zh" if index == 0 else "en"
+        self._config_set("ui.language", new_lang)
 
     def _on_length_input_changed(self) -> None:
         text = self._length_input.text().strip()

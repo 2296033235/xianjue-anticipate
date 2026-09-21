@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtWidgets import QApplication
 
 from .core.config import Config
@@ -12,6 +12,23 @@ from .providers.factory import create_provider
 from .ui.floating_window import FloatingWindow
 from .ui.tray import TrayIcon
 from .ui.main_window import MainWindow
+
+
+class _MainThreadCaller(QObject):
+    """Thread-safe bridge: emits a callable to be executed on the main thread."""
+
+    execute = __import__("PySide6").QtCore.Signal(object)
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.execute.connect(self._run)
+
+    def call(self, fn) -> None:
+        self.execute.emit(fn)
+
+    @staticmethod
+    def _run(fn) -> None:
+        fn()
 
 
 class XianJueApp:
@@ -27,6 +44,7 @@ class XianJueApp:
         self.config_get = self.config.get
         self.config_set = self.config.set
         self.db = Database()
+        self._caller = _MainThreadCaller()
 
         self._build_components()
 
@@ -66,7 +84,12 @@ class XianJueApp:
 
     def _on_translation_result(self, result, source_text: str) -> None:
         """Called from the pipeline thread; must be on the main thread."""
-        QTimer.singleShot(0, lambda: self.floating_window.show_translation(result, source_text))
+        self._caller.call(lambda: self._show_translation_result(result, source_text))
+
+    def _show_translation_result(self, result, source_text: str) -> None:
+        """Runs on the main thread."""
+        self.floating_window.show_translation(result, source_text)
+        self.db.add_history(source_text, result.translation, "auto", "auto", result.engine)
         print(f"[app] shown in floating window ({len(result.translation)} chars)")
 
     def _on_manual_translate(self, text: str, source_lang: str, target_lang: str) -> None:
@@ -75,10 +98,13 @@ class XianJueApp:
         from .core.text_repair import repair
 
         def worker():
-            repaired = repair(text)
-            result = self.provider.translate(repaired, source_lang, target_lang, detailed=True)
-            self.db.add_history(repaired, result.translation, source_lang, target_lang, result.engine)
-            QTimer.singleShot(0, lambda: self.main_window.show_manual_result(result, repaired))
+            try:
+                repaired = repair(text)
+                result = self.provider.translate(repaired, source_lang, target_lang, detailed=True)
+                self.db.add_history(repaired, result.translation, source_lang, target_lang, result.engine)
+                self._caller.call(lambda: self.main_window.show_manual_result(result, repaired))
+            except Exception as e:
+                self._caller.call(lambda: self.main_window.show_manual_error(str(e)))
 
         threading.Thread(target=worker, daemon=True).start()
 
