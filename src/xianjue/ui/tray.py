@@ -49,20 +49,22 @@ class TrayIcon(QSystemTrayIcon):
 
     def _build_menu(self) -> None:
         menu = QMenu()
-        self._toggle_floating_action = menu.addAction("Show/Hide Floating Window")
+        from .i18n import tr
+        lang = self._config_get("ui.language", "zh")
+        self._toggle_floating_action = menu.addAction(tr("Show/Hide Floating Window", lang))
         self._toggle_floating_action.triggered.connect(self.toggle_floating.emit)
         menu.addSeparator()
-        self._pause_action = menu.addAction("Pause Active Translation")
+        self._pause_action = menu.addAction(tr("Pause Active Translation", lang))
         self._pause_action.setCheckable(True)
         self._pause_action.toggled.connect(self._on_pause_toggled)
         menu.addSeparator()
-        self._open_main_action = menu.addAction("Open Main Window")
+        self._open_main_action = menu.addAction(tr("Open Main Window", lang))
         self._open_main_action.triggered.connect(self.open_main.emit)
-        self._auto_start_action = menu.addAction("Auto Start")
+        self._auto_start_action = menu.addAction(tr("Auto Start", lang))
         self._auto_start_action.setCheckable(True)
         self._auto_start_action.setChecked(self._config_get("startup.auto_start", False))
         menu.addSeparator()
-        self._quit_action = menu.addAction("Quit")
+        self._quit_action = menu.addAction(tr("Quit", lang))
         self._quit_action.triggered.connect(self.quit_app.emit)
         self.setContextMenu(menu)
 

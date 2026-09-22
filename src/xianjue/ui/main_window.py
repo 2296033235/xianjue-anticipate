@@ -301,13 +301,13 @@ class MainWindow(QMainWindow):
 
         # Language selection.
         lang_layout = QHBoxLayout()
-        lang_layout.addWidget(QLabel("From:"))
+        lang_layout.addWidget(QLabel(self._tr("From:")))
         self._source_lang_combo = QComboBox()
-        self._source_lang_combo.addItems(["Auto", "English", "Chinese", "Japanese", "Korean", "French", "German", "Spanish", "Russian"])
+        self._source_lang_combo.addItems([self._tr(l) for l in ["Auto", "English", "Chinese", "Japanese", "Korean", "French", "German", "Spanish", "Russian"]])
         lang_layout.addWidget(self._source_lang_combo)
-        lang_layout.addWidget(QLabel("To:"))
+        lang_layout.addWidget(QLabel(self._tr("To:")))
         self._target_lang_combo = QComboBox()
-        self._target_lang_combo.addItems(["Chinese", "English", "Japanese", "Korean", "French", "German", "Spanish", "Russian"])
+        self._target_lang_combo.addItems([self._tr(l) for l in ["Chinese", "English", "Japanese", "Korean", "French", "German", "Spanish", "Russian"]])
         lang_layout.addWidget(self._target_lang_combo)
         lang_layout.addStretch()
 

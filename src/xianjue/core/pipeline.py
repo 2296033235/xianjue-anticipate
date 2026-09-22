@@ -111,19 +111,27 @@ class TranslationPipeline:
         # Run translation in a background thread.
         def _do_translate():
             print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:80]}...")
-            # Quick mode for the floating window (fast, plain translation).
-            result = self._provider.translate(repaired, source_lang, target_lang, detailed=False)
-            # Only deliver if no newer request has been made.
-            with self._lock:
-                is_current = (current_gen == self._request_generation)
-            if is_current:
-                # Cache.
-                self._last_translation_cache[cache_key] = result
-                if len(self._last_translation_cache) > self._cache_max:
-                    # Evict oldest (dict preserves insertion order).
-                    first_key = next(iter(self._last_translation_cache))
-                    del self._last_translation_cache[first_key]
-                print(f"[pipeline] done: {len(result.translation)} chars, {result.latency:.2f}s")
-                self._on_result(result, repaired)
+            try:
+                # Quick mode for the floating window (fast, plain translation).
+                result = self._provider.translate(repaired, source_lang, target_lang, detailed=False)
+                # Only deliver if no newer request has been made.
+                with self._lock:
+                    is_current = (current_gen == self._request_generation)
+                if is_current:
+                    # Cache.
+                    self._last_translation_cache[cache_key] = result
+                    if len(self._last_translation_cache) > self._cache_max:
+                        # Evict oldest (dict preserves insertion order).
+                        first_key = next(iter(self._last_translation_cache))
+                        del self._last_translation_cache[first_key]
+                    print(f"[pipeline] done: {len(result.translation)} chars, {result.latency:.2f}s")
+                    self._on_result(result, repaired)
+            except Exception as e:
+                error_msg = f"Translation error: {e}"
+                error_result = TranslationResult(translation=error_msg, engine="error", latency=0)
+                with self._lock:
+                    is_current = (current_gen == self._request_generation)
+                if is_current:
+                    self._on_result(error_result, repaired)
 
         threading.Thread(target=_do_translate, daemon=True).start()

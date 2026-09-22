@@ -45,6 +45,22 @@ _LABELS_ZH = {
     "Due now": "现在复习",
     "Refresh": "刷新",
     "No words due for review.": "没有需要复习的单词。",
+    "Show/Hide Floating Window": "显示/隐藏悬浮窗",
+    "Pause Active Translation": "暂停主动翻译",
+    "Open Main Window": "打开主界面",
+    "Auto Start": "开机自启",
+    "Quit": "退出",
+    "Auto": "自动检测",
+    "English": "英语",
+    "Chinese": "中文",
+    "Japanese": "日语",
+    "Korean": "韩语",
+    "French": "法语",
+    "German": "德语",
+    "Spanish": "西班牙语",
+    "Russian": "俄语",
+    "From:": "从：",
+    "To:": "到：",
 }
 
 
