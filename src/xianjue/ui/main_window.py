@@ -505,17 +505,12 @@ class MainWindow(QMainWindow):
         float_group = QGroupBox(self._tr("Floating Window"))
         float_layout = QVBoxLayout(float_group)
 
-        self._hover_pause_check = QCheckBox(self._tr("Pause countdown on hover"))
-        self._hover_pause_check.setChecked(self._config_get("floating_window.hover_pause_countdown", True))
-        self._hover_pause_check.toggled.connect(lambda v: self._config_set("floating_window.hover_pause_countdown", v))
-        float_layout.addWidget(self._hover_pause_check)
-
         self._hover_orig_check = QCheckBox(self._tr("Hover shows original text"))
         self._hover_orig_check.setChecked(self._config_get("floating_window.hover_show_original", True))
         self._hover_orig_check.toggled.connect(lambda v: self._config_set("floating_window.hover_show_original", v))
         float_layout.addWidget(self._hover_orig_check)
 
-        self._show_orig_check = QCheckBox(self._tr("Show original text section (default off)"))
+        self._show_orig_check = QCheckBox(self._tr("Show original during translation"))
         self._show_orig_check.setChecked(self._config_get("floating_window.show_original_section", False))
         self._show_orig_check.toggled.connect(lambda v: self._config_set("floating_window.show_original_section", v))
         float_layout.addWidget(self._show_orig_check)
@@ -524,6 +519,11 @@ class MainWindow(QMainWindow):
         self._focus_mode_check.setChecked(self._config_get("focus_mode", True))
         self._focus_mode_check.toggled.connect(lambda v: self._config_set("focus_mode", v))
         float_layout.addWidget(self._focus_mode_check)
+
+        self._auto_hide_check = QCheckBox(self._tr("Enable auto-hide"))
+        self._auto_hide_check.setChecked(self._config_get("floating_window.auto_hide", True))
+        self._auto_hide_check.toggled.connect(lambda v: self._config_set("floating_window.auto_hide", v))
+        float_layout.addWidget(self._auto_hide_check)
 
         layout.addWidget(float_group)
 

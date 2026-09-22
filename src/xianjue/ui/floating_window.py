@@ -22,6 +22,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..providers.base import TranslationResult
+from .i18n import tr as _tr_fn
 from ..providers.prompts import TRANSLATION_QUICK_PROMPT
 
 
@@ -132,6 +133,7 @@ class FloatingWindow(QWidget):
     # --- UI construction ------------------------------------------------------
 
     def _build_ui(self) -> None:
+        self._lang = self._config_get("ui.language", "zh")
         self.setFixedWidth(380)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
 
@@ -143,24 +145,24 @@ class FloatingWindow(QWidget):
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(8, 2, 8, 2)
 
-        self._pin_btn = QPushButton("pin")
+        self._pin_btn = QPushButton(self._tr("Pin"))
         self._pin_btn.setObjectName("controlBtn")
         if self._pinned:
             self._pin_btn.setObjectName("pinBtnActive")
-            self._pin_btn.setText("pinned")
-        self._pin_btn.setToolTip("Pin: keep window visible")
+            self._pin_btn.setText(self._tr("Pinned"))
+        self._pin_btn.setToolTip(self._tr("Pin: keep window visible"))
         self._pin_btn.clicked.connect(self._toggle_pin)
         top_bar.addWidget(self._pin_btn)
 
-        self._density_btn = QPushButton("detail" if self._density == "compact" else "simple")
+        self._density_btn = QPushButton(self._tr("Detail") if self._density == "compact" else self._tr("Simple"))
         self._density_btn.setObjectName("controlBtn")
-        self._density_btn.setToolTip("Switch display density")
+        self._density_btn.setToolTip(self._tr("Switch display density"))
         self._density_btn.clicked.connect(self._toggle_density)
         top_bar.addWidget(self._density_btn)
 
         top_bar.addStretch()
 
-        self._close_btn = QPushButton("close")
+        self._close_btn = QPushButton(self._tr("Close"))
         self._close_btn.setObjectName("controlBtn")
         self._close_btn.clicked.connect(self.hide)
         top_bar.addWidget(self._close_btn)
@@ -197,6 +199,13 @@ class FloatingWindow(QWidget):
 
         self._detail_widget.setVisible(False)
         layout.addWidget(self._detail_widget)
+
+        # Original text section (toggleable).
+        self._original_label = QLabel()
+        self._original_label.setObjectName("detailSection")
+        self._original_label.setWordWrap(True)
+        self._original_label.setVisible(False)
+        layout.addWidget(self._original_label)
 
         # Engine indicator (privacy transparency).
         self._engine_label = QLabel()
@@ -235,6 +244,12 @@ class FloatingWindow(QWidget):
 
         # Position near the cursor.
         self._position_near_cursor()
+
+        # Show/hide original text section per setting.
+        show_orig = self._config_get("floating_window.show_original_section", False)
+        self._original_label.setVisible(show_orig)
+        if show_orig:
+            self._original_label.setText(f"<span style='color:#8090B0'>{source_text}</span>")
 
         # Show without stealing focus.
         self.show()
@@ -286,9 +301,15 @@ class FloatingWindow(QWidget):
 
     # --- auto-hide countdown ----------------------------------------------------
 
+    def _tr(self, text: str) -> str:
+        """Translate a UI label using the configured language."""
+        return _tr_fn(text, self._lang)
+
     def _start_countdown(self) -> None:
         if self._pinned:
             self._auto_hide_timer.stop()
+            return
+        if not self._config_get("floating_window.auto_hide", True):
             return
         if self._typing:
             return
@@ -316,11 +337,11 @@ class FloatingWindow(QWidget):
         self._config_set("floating_window.pinned", self._pinned)
         if self._pinned:
             self._pin_btn.setObjectName("pinBtnActive")
-            self._pin_btn.setText("pinned")
+            self._pin_btn.setText(self._tr("Pinned"))
             self._auto_hide_timer.stop()
         else:
             self._pin_btn.setObjectName("controlBtn")
-            self._pin_btn.setText("pin")
+            self._pin_btn.setText(self._tr("Pin"))
             self._start_countdown()
         # Refresh stylesheet.
         self._pin_btn.style().unpolish(self._pin_btn)
@@ -331,7 +352,7 @@ class FloatingWindow(QWidget):
         self._config_set("floating_window.density", self._density)
         show_detail = (self._density == "detailed")
         self._detail_widget.setVisible(show_detail)
-        self._density_btn.setText("simple" if show_detail else "detail")
+        self._density_btn.setText(self._tr("Simple") if show_detail else self._tr("Detail"))
         # Force recalc.
         self.adjustSize()
 
