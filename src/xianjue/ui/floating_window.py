@@ -248,13 +248,13 @@ class FloatingWindow(QWidget):
         self._type_pos = 0
         self._typing = True
         self._text_area.setPlainText("")
-        self._type_timer.start(20)
+        self._type_timer.start(30)
 
     def _type_tick(self) -> None:
         """Reveal 2-3 characters per tick."""
         if not self._typing:
             return
-        self._type_pos = min(self._type_pos + 2, len(self._type_full_text))
+        self._type_pos = min(self._type_pos + 1, len(self._type_full_text))
         self._text_area.setPlainText(self._type_full_text[: self._type_pos])
         if self._type_pos >= len(self._type_full_text):
             self._typing = False
