@@ -131,6 +131,7 @@ class MainWindow(QMainWindow):
         config_set: Callable,
         on_translate_manual: Callable,
         db,
+        refresh_provider: Callable,
     ) -> None:
         super().__init__()
         self.setWindowTitle("XianJue (先觉)")
@@ -141,6 +142,7 @@ class MainWindow(QMainWindow):
         self._config_set = config_set
         self._db = db
         self._on_translate_manual = on_translate_manual
+        self._refresh_provider = refresh_provider
 
         # UI language: read once, labels are built in the chosen language.
         self._lang = config("ui.language", "zh")
@@ -484,7 +486,9 @@ class MainWindow(QMainWindow):
         self._engine_combo.currentIndexChanged.connect(self._on_engine_changed)
         engine_layout.addWidget(self._engine_combo)
 
-        key_row = QHBoxLayout()
+        self._key_row_widget = QWidget()
+        key_row = QHBoxLayout(self._key_row_widget)
+        key_row.setContentsMargins(0, 0, 0, 0)
         key_row.addWidget(QLabel(self._tr("API Key:")))
         self._api_key_input = QLineEdit(self._config_get("model.cloud.api_key", ""))
         self._api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -492,9 +496,10 @@ class MainWindow(QMainWindow):
         test_btn = QPushButton(self._tr("Test"))
         test_btn.clicked.connect(self._test_connection)
         key_row.addWidget(test_btn)
-        engine_layout.addLayout(key_row)
+        engine_layout.addWidget(self._key_row_widget)
 
         layout.addWidget(engine_group)
+        self._key_row_widget.setVisible(self._config_get("model.provider", "cloud") == "cloud")
 
         # Floating window group.
         float_group = QGroupBox(self._tr("Floating Window"))
@@ -596,10 +601,28 @@ class MainWindow(QMainWindow):
     def _on_engine_changed(self, index: int) -> None:
         provider = "cloud" if index == 0 else "local"
         self._config_set("model.provider", provider)
+        # Show/hide API key row based on engine selection.
+        self._key_row_widget.setVisible(provider == "cloud")
+        self._refresh_provider()
 
     def _test_connection(self) -> None:
         self._config_set("model.cloud.api_key", self._api_key_input.text().strip())
-        QMessageBox.information(self, "Test", "Key saved. Connection test will be implemented in the next version.")
+        import threading
+        from ..providers.factory import create_provider
+
+        def test():
+            try:
+                provider = create_provider(self._config_get)
+                ok = provider.test_connection()
+                msg = "OK" if ok else "Connection failed"
+            except Exception as e:
+                msg = str(e)
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(0, lambda: QMessageBox.information(
+                self, self._tr("Test"), msg
+            ))
+
+        threading.Thread(target=test, daemon=True).start()
 
     # --- utils -------------------------------------------------------------------
 

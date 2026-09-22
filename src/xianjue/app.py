@@ -56,7 +56,7 @@ class XianJueApp:
         )
 
         # Translation pipeline.
-        self.provider = create_provider(self.config_get)
+        self._refresh_provider()
         self.pipeline = TranslationPipeline(
             config_get=self.config_get,
             provider=self.provider,
@@ -99,8 +99,9 @@ class XianJueApp:
 
         def worker():
             try:
+                provider = create_provider(self.config_get)
                 repaired = repair(text)
-                result = self.provider.translate(repaired, source_lang, target_lang, detailed=True)
+                result = provider.translate(repaired, source_lang, target_lang, detailed=True)
                 self.db.add_history(repaired, result.translation, source_lang, target_lang, result.engine)
                 self._caller.call(lambda: self.main_window.show_manual_result(result, repaired))
             except Exception as e:
@@ -131,6 +132,11 @@ class XianJueApp:
         self.pipeline.stop()
         self.db.close()
         self.qt_app.quit()
+
+    def _refresh_provider(self) -> None:
+        """Recreate the provider from current config (called on engine change)."""
+        self.provider = create_provider(self.config_get)
+        self.pipeline.provider = self.provider
 
     def run(self) -> int:
         return self.qt_app.exec()
