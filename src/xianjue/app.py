@@ -56,7 +56,7 @@ class XianJueApp:
         )
 
         # Translation pipeline.
-        self._refresh_provider()
+        self.provider = create_provider(self.config_get)
         self.pipeline = TranslationPipeline(
             config_get=self.config_get,
             provider=self.provider,
@@ -69,6 +69,7 @@ class XianJueApp:
             config_set=self.config_set,
             on_translate_manual=self._on_manual_translate,
             db=self.db,
+            refresh_provider=self._refresh_provider,
         )
 
         # Tray.
@@ -136,7 +137,8 @@ class XianJueApp:
     def _refresh_provider(self) -> None:
         """Recreate the provider from current config (called on engine change)."""
         self.provider = create_provider(self.config_get)
-        self.pipeline.provider = self.provider
+        if hasattr(self, "pipeline"):
+            self.pipeline.provider = self.provider
 
     def run(self) -> int:
         return self.qt_app.exec()
