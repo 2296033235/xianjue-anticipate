@@ -112,6 +112,14 @@ class FloatingWindow(QWidget):
         self._auto_hide_timer.timeout.connect(self._tick_countdown)
         self._countdown_remaining = 0
 
+        # Typewriter animation.
+        self._type_timer = QTimer(self)
+        self._type_timer.setSingleShot(False)
+        self._type_timer.timeout.connect(self._type_tick)
+        self._type_full_text = ""
+        self._type_pos = 0
+        self._typing = False
+
         # Current display state.
         self._pinned = config_get("floating_window.pinned", False)
         self._density = config_get("floating_window.density", "compact")
@@ -202,9 +210,8 @@ class FloatingWindow(QWidget):
         self._current_result = result
         self._current_source = source_text
 
-        # Update translation text.
-        display_text = result.translation
-        self._text_area.setPlainText(display_text)
+        # Start typewriter animation for the translation.
+        self._start_typewriter(result.translation)
 
         # Update detail sections (visible only in detailed mode).
         terms_html = ""
@@ -233,8 +240,26 @@ class FloatingWindow(QWidget):
         self.show()
         self.raise_()
 
-        # Start auto-hide countdown (unless pinned).
-        self._start_countdown()
+        # Auto-hide countdown starts after typing animation completes.
+
+    def _start_typewriter(self, text: str) -> None:
+        """Begin progressive text reveal."""
+        self._type_full_text = text
+        self._type_pos = 0
+        self._typing = True
+        self._text_area.setPlainText("")
+        self._type_timer.start(20)
+
+    def _type_tick(self) -> None:
+        """Reveal 2-3 characters per tick."""
+        if not self._typing:
+            return
+        self._type_pos = min(self._type_pos + 2, len(self._type_full_text))
+        self._text_area.setPlainText(self._type_full_text[: self._type_pos])
+        if self._type_pos >= len(self._type_full_text):
+            self._typing = False
+            self._type_timer.stop()
+            self._start_countdown()
 
     def _position_near_cursor(self) -> None:
         """Position the window near the mouse cursor, clamped to screen bounds."""
@@ -264,6 +289,8 @@ class FloatingWindow(QWidget):
     def _start_countdown(self) -> None:
         if self._pinned:
             self._auto_hide_timer.stop()
+            return
+        if self._typing:
             return
         seconds = self._config_get("floating_window.auto_hide_seconds", 8)
         self._countdown_remaining = seconds * 10  # 100ms ticks
