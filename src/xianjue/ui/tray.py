@@ -51,7 +51,8 @@ class TrayIcon(QSystemTrayIcon):
         menu = QMenu()
         from .i18n import tr
         lang = self._config_get("ui.language", "zh")
-        self._toggle_floating_action = menu.addAction(tr("Show/Hide Floating Window", lang))
+        self._toggle_floating_action = menu.addAction(tr("Show Floating Window", lang))
+        self._toggle_floating_action.setCheckable(True)
         self._toggle_floating_action.triggered.connect(self.toggle_floating.emit)
         menu.addSeparator()
         self._pause_action = menu.addAction(tr("Pause Active Translation", lang))

@@ -79,6 +79,7 @@ class TranslationPipeline:
 
     def _handle_text(self, raw: str, repaired: str) -> None:
         """Called by clipboard monitor when a valid text is detected."""
+        print(f"[pipeline] _handle_text called, len={len(repaired)}", flush=True)
         # Increment generation to cancel any in-flight translation.
         with self._lock:
             self._request_generation += 1
@@ -101,16 +102,18 @@ class TranslationPipeline:
         if source_lang == target_lang:
             if self._on_skip:
                 self._on_skip(raw, f"source==target ({source_lang})")
+            print(f"[pipeline] SKIPPED: source==target ({source_lang})", flush=True)
             return
 
         if source_lang == "unknown":
             if self._on_skip:
                 self._on_skip(raw, "unknown language")
+            print("[pipeline] SKIPPED: unknown language", flush=True)
             return
 
         # Run translation in a background thread.
         def _do_translate():
-            print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:80]}...")
+            print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:80]}...", flush=True)
             try:
                 # Quick mode for the floating window (fast, plain translation).
                 result = self._provider.translate(repaired, source_lang, target_lang, detailed=False)
@@ -124,10 +127,11 @@ class TranslationPipeline:
                         # Evict oldest (dict preserves insertion order).
                         first_key = next(iter(self._last_translation_cache))
                         del self._last_translation_cache[first_key]
-                    print(f"[pipeline] done: {len(result.translation)} chars, {result.latency:.2f}s")
+                    print(f"[pipeline] done: {len(result.translation)} chars, {result.latency:.2f}s", flush=True)
                     self._on_result(result, repaired)
             except Exception as e:
                 error_msg = f"Translation error: {e}"
+                print(f"[pipeline] error: {error_msg}", flush=True)
                 error_result = TranslationResult(translation=error_msg, engine="error", latency=0)
                 with self._lock:
                     is_current = (current_gen == self._request_generation)

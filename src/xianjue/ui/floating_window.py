@@ -97,6 +97,7 @@ class FloatingWindow(QWidget):
             | Qt.WindowType.FramelessWindowHint
         )
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
         self.setObjectName("floatingWindow")
         self.setStyleSheet(_STYLE)
 

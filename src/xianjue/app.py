@@ -91,7 +91,7 @@ class XianJueApp:
         """Runs on the main thread."""
         self.floating_window.show_translation(result, source_text)
         self.db.add_history(source_text, result.translation, "auto", "auto", result.engine)
-        print(f"[app] shown in floating window ({len(result.translation)} chars)")
+        print(f"[app] shown in floating window ({len(result.translation)} chars)", flush=True)
 
     def _on_manual_translate(self, text: str, source_lang: str, target_lang: str) -> None:
         """Manual translation from the main window."""
@@ -114,11 +114,13 @@ class XianJueApp:
     def _toggle_floating(self) -> None:
         if self.floating_window.isVisible():
             self.floating_window.hide()
+            self.tray._toggle_floating_action.setChecked(False)
         elif self.floating_window._current_result:
             self.floating_window.show_translation(
                 self.floating_window._current_result,
                 self.floating_window._current_source,
             )
+            self.tray._toggle_floating_action.setChecked(True)
 
     def _set_paused(self, paused: bool) -> None:
         self.pipeline.paused = paused
