@@ -87,8 +87,6 @@ class ClipboardMonitor:
         self._suppress_until = time.time() + 1.0
 
     def _poll_loop(self) -> None:
-        print("[clipboard] poll loop started", flush=True)
-        poll_count = 0
         while self._running:
             try:
                 current = pyperclip.paste()
@@ -98,9 +96,6 @@ class ClipboardMonitor:
                 continue
 
             if current == self._last_clipboard:
-                poll_count += 1
-                if poll_count % 10 == 0:
-                    print(f"[clipboard] poll #{poll_count}, unchanged: {repr(current[:20])}", flush=True)
                 time.sleep(self._poll_interval)
                 continue
 

@@ -79,7 +79,6 @@ class TranslationPipeline:
 
     def _handle_text(self, raw: str, repaired: str) -> None:
         """Called by clipboard monitor when a valid text is detected."""
-        print(f"[pipeline] _handle_text called, len={len(repaired)}", flush=True)
         # Increment generation to cancel any in-flight translation.
         with self._lock:
             self._request_generation += 1
@@ -102,18 +101,18 @@ class TranslationPipeline:
         if source_lang == target_lang:
             if self._on_skip:
                 self._on_skip(raw, f"source==target ({source_lang})")
-            print(f"[pipeline] SKIPPED: source==target ({source_lang})", flush=True)
+            print(f"[pipeline] skipped: source==target ({source_lang})", flush=True)
             return
 
         if source_lang == "unknown":
             if self._on_skip:
                 self._on_skip(raw, "unknown language")
-            print("[pipeline] SKIPPED: unknown language", flush=True)
+            print("[pipeline] skipped: unknown language", flush=True)
             return
 
         # Run translation in a background thread.
         def _do_translate():
-            print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:80]}...", flush=True)
+            print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:40]}...", flush=True)
             try:
                 # Quick mode for the floating window (fast, plain translation).
                 result = self._provider.translate(repaired, source_lang, target_lang, detailed=False)
