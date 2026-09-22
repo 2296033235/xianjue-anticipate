@@ -167,7 +167,7 @@ class MainWindow(QMainWindow):
         self._stack = QStackedWidget()
 
         for key, label in _NAV_ITEMS:
-            btn = QPushButton(label)
+            btn = QPushButton(self._tr(label))
             btn.setObjectName("navBtn")
             btn.clicked.connect(lambda checked, k=key: self._navigate(k))
             sidebar_layout.addWidget(btn)
@@ -531,7 +531,11 @@ class MainWindow(QMainWindow):
         self._ui_lang_combo.setCurrentIndex(0 if self._config_get("ui.language", "zh") == "zh" else 1)
         self._ui_lang_combo.currentIndexChanged.connect(self._on_ui_lang_changed)
         ui_lang_layout.addWidget(self._ui_lang_combo)
-        ui_lang_layout.addWidget(QLabel("(重启生效)"))
+        apply_lang_btn = QPushButton(self._tr("Refresh"))
+        apply_lang_btn.setObjectName("primaryBtn")
+        apply_lang_btn.setFixedHeight(30)
+        apply_lang_btn.clicked.connect(self._apply_ui_language)
+        ui_lang_layout.addWidget(apply_lang_btn)
         ui_lang_layout.addStretch()
         layout.addWidget(ui_lang_group)
 
@@ -553,6 +557,31 @@ class MainWindow(QMainWindow):
     def _on_ui_lang_changed(self, index: int) -> None:
         new_lang = "zh" if index == 0 else "en"
         self._config_set("ui.language", new_lang)
+
+    def _apply_ui_language(self) -> None:
+        """Rebuild the entire UI with the currently selected language."""
+        self._lang = "zh" if self._ui_lang_combo.currentIndex() == 0 else "en"
+        self._config_set("ui.language", self._lang)
+
+        # Rebuild nav buttons.
+        for key, label in _NAV_ITEMS:
+            btn = self._nav_buttons[key]
+            btn.setText(self._tr(label))
+
+        # Rebuild pages.
+        while self._stack.count() > 0:
+            widget = self._stack.widget(0)
+            self._stack.removeWidget(widget)
+            if widget:
+                widget.deleteLater()
+
+        self._stack.addWidget(self._build_dashboard_page())
+        self._stack.addWidget(self._build_translate_page())
+        self._stack.addWidget(self._build_vocabulary_page())
+        self._stack.addWidget(self._build_review_page())
+        self._stack.addWidget(self._build_history_page())
+        self._stack.addWidget(self._build_settings_page())
+        self._navigate("dashboard")
 
     def _on_length_input_changed(self) -> None:
         text = self._length_input.text().strip()

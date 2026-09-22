@@ -104,7 +104,8 @@ class XianJueApp:
                 self.db.add_history(repaired, result.translation, source_lang, target_lang, result.engine)
                 self._caller.call(lambda: self.main_window.show_manual_result(result, repaired))
             except Exception as e:
-                self._caller.call(lambda: self.main_window.show_manual_error(str(e)))
+                error_str = str(e)
+                self._caller.call(lambda: self.main_window.show_manual_error(error_str))
 
         threading.Thread(target=worker, daemon=True).start()
 
