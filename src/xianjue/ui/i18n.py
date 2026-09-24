@@ -76,6 +76,7 @@ _LABELS_ZH = {
     "No context available.": "暂无上下文。",
     "Select how well you remembered it.": "请选择你对这个词的记忆情况。",
     "Mark as Vocabulary": "标记生词",
+    "Today": "今天",
 }
 
 
