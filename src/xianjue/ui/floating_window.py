@@ -31,45 +31,42 @@ from ..providers.prompts import TRANSLATION_QUICK_PROMPT
 
 _STYLE = """
 QWidget#floatingWindow {
-    background-color: rgba(18, 21, 25, 245);
-    border-radius: 16px;
+    background-color: rgba(30, 30, 35, 235);
+    border-radius: 12px;
 }
 QLabel#titleBar {
-    color: #A9B6C3;
+    color: rgba(200, 200, 210, 180);
     font-size: 11px;
-    padding: 4px 14px 0px 14px;
+    padding: 4px 8px 0px 12px;
 }
 QTextBrowser#translationArea {
     background: transparent;
-    color: #E6EDF3;
-    background-color: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    padding: 10px 12px;
+    color: #E8E8EA;
     border: none;
-    font-size: 15px;
-    selection-background-color: rgba(47, 214, 162, 0.35);
+    font-size: 14px;
+    selection-background-color: rgba(80, 120, 200, 120);
 }
 QLabel#detailSection {
-    color: #A5B2C0;
+    color: #B8B8C0;
     font-size: 12px;
-    padding: 6px 14px;
+    padding: 4px 12px;
 }
 QPushButton#controlBtn {
-    background: rgba(255, 255, 255, 0.07);
-    color: #A9B6C3;
+    background: transparent;
+    color: rgba(180, 180, 190, 160);
     border: none;
-    font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 999px;
+    font-size: 14px;
+    padding: 2px 6px;
+    border-radius: 4px;
 }
 QPushButton#controlBtn:hover {
-    background: rgba(255, 255, 255, 0.14);
-    color: #E6EDF3;
+    background: rgba(255, 255, 255, 30);
+    color: #FFFFFF;
 }
 QLabel#engineLabel {
-    color: #7C8794;
-    font-size: 10px;
-    padding: 4px 14px 10px 14px;
+    color: rgba(140, 160, 200, 100);
+    font-size: 9px;
+    padding: 0px 12px 4px 12px;
 }
 """
 
@@ -134,17 +131,16 @@ class FloatingWindow(QWidget):
 
     def _build_ui(self) -> None:
         self._lang = self._config_get("ui.language", "zh")
-        self.setFixedWidth(360)
+        self.setFixedWidth(380)
         self.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Preferred)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(14, 10, 14, 12)
-        layout.setSpacing(6)
+        layout.setContentsMargins(1, 1, 1, 1)
+        layout.setSpacing(0)
 
         # Top bar: density | close
         top_bar = QHBoxLayout()
-        top_bar.setContentsMargins(2, 0, 2, 0)
-        top_bar.setSpacing(8)
+        top_bar.setContentsMargins(8, 2, 8, 2)
 
         self._density_btn = QPushButton(self._tr("Detail") if self._density == "compact" else self._tr("Simple"))
         self._density_btn.setObjectName("controlBtn")
@@ -392,6 +388,6 @@ class FloatingWindow(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         path = QPainterPath()
-        path.addRoundedRect(QRectF(self.rect()), 16, 16)
-        painter.fillPath(path, QColor(18, 21, 25, 245))
+        path.addRoundedRect(QRectF(self.rect()), 12, 12)
+        painter.fillPath(path, QColor(30, 30, 35, 235))
         super().paintEvent(event)
