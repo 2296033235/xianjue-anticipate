@@ -363,6 +363,16 @@ class MainWindow(QMainWindow):
     def _build_vocabulary_page(self) -> QWidget:
         scroll, layout = self._make_page(self._tr("Vocabulary"))
 
+        actions_layout = QHBoxLayout()
+        refresh_btn = QPushButton(self._tr("Refresh"))
+        refresh_btn.setObjectName("primaryBtn")
+        refresh_btn.clicked.connect(self.refresh_vocabulary)
+        delete_btn = QPushButton(self._tr("Delete"))
+        delete_btn.clicked.connect(self._delete_selected_word)
+        actions_layout.addWidget(refresh_btn)
+        actions_layout.addWidget(delete_btn)
+        actions_layout.addStretch()
+
         self._vocab_table = QTableWidget()
         self._vocab_table.setColumnCount(5)
         self._vocab_table.setHorizontalHeaderLabels([
@@ -375,12 +385,11 @@ class MainWindow(QMainWindow):
         self._vocab_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self._vocab_table.horizontalHeader().setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         self._vocab_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._vocab_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._vocab_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         layout.addWidget(self._vocab_table)
 
-        refresh_btn = QPushButton(self._tr("Refresh"))
-        refresh_btn.setObjectName("primaryBtn")
-        refresh_btn.clicked.connect(self.refresh_vocabulary)
-        layout.addWidget(refresh_btn)
+        layout.addLayout(actions_layout)
 
         return scroll
 
@@ -390,26 +399,114 @@ class MainWindow(QMainWindow):
         import time as _time
         for i, w in enumerate(words):
             self._vocab_table.setItem(i, 0, QTableWidgetItem(w["word"]))
-            self._vocab_table.setItem(i, 1, QTableWidgetItem(w["context_sentence"][:40]))
-            self._vocab_table.setItem(i, 2, QTableWidgetItem(str(w["repetitions"])))
+            self._vocab_table.setItem(i, 1, QTableWidgetItem(_time.strftime("%m-%d %H:%M", _time.localtime(w["marked_at"]))))
+            self._vocab_table.setItem(i, 2, QTableWidgetItem(w["context_sentence"][:40]))
+            self._vocab_table.setItem(i, 3, QTableWidgetItem(str(w["repetitions"])))
             nr = w["next_review"]
             if nr <= _time.time():
                 nr_text = self._tr("Due now")
             else:
                 nr_text = f"in {int((nr - _time.time()) / 86400)}d"
-            self._vocab_table.setItem(i, 3, QTableWidgetItem(str(nr)))
             self._vocab_table.setItem(i, 4, QTableWidgetItem(nr_text))
+
+    def _delete_selected_word(self) -> None:
+        row = self._vocab_table.currentRow()
+        if row < 0:
+            return
+        word = self._vocab_table.item(row, 0).text()
+        if self._db.delete_word(word):
+            self.refresh_vocabulary()
 
     # --- review -------------------------------------------------------------------
 
     def _build_review_page(self) -> QWidget:
         scroll, layout = self._make_page(self._tr("Review"))
 
-        info = QLabel(self._tr("No words due for review."))
-        info.setObjectName("infoText")
-        layout.addWidget(info)
+        self._review_status = QLabel(self._tr("No words due for review."))
+        self._review_status.setObjectName("infoText")
+        layout.addWidget(self._review_status)
+
+        review_group = QGroupBox(self._tr("Review"))
+        review_layout = QVBoxLayout(review_group)
+
+        self._review_word_label = QLabel()
+        self._review_word_label.setObjectName("pageTitle")
+        review_layout.addWidget(self._review_word_label)
+
+        self._review_context_label = QLabel()
+        self._review_context_label.setWordWrap(True)
+        review_layout.addWidget(self._review_context_label)
+
+        self._review_answer_label = QLabel()
+        self._review_answer_label.setWordWrap(True)
+        review_layout.addWidget(self._review_answer_label)
+
+        button_layout = QHBoxLayout()
+        self._forgot_btn = QPushButton(self._tr("Forgot"))
+        self._forgot_btn.clicked.connect(lambda: self._grade_current_word(1))
+        self._fuzzy_btn = QPushButton(self._tr("Fuzzy"))
+        self._fuzzy_btn.clicked.connect(lambda: self._grade_current_word(3))
+        self._known_btn = QPushButton(self._tr("Known"))
+        self._known_btn.clicked.connect(lambda: self._grade_current_word(4))
+        self._easy_btn = QPushButton(self._tr("Easy"))
+        self._easy_btn.clicked.connect(lambda: self._grade_current_word(5))
+        for btn in [self._forgot_btn, self._fuzzy_btn, self._known_btn, self._easy_btn]:
+            button_layout.addWidget(btn)
+
+        review_layout.addLayout(button_layout)
+        layout.addWidget(review_group)
         layout.addStretch()
         return scroll
+
+    def refresh_review(self) -> None:
+        self._review_words = self._db.get_due_words(limit=50)
+        self._review_index = 0
+        if not self._review_words:
+            self._review_status.setText(self._tr("No words due for review."))
+            self._review_word_label.setText("")
+            self._review_context_label.setText("")
+            self._review_answer_label.setText("")
+            self._review_word_label.hide()
+            self._review_context_label.hide()
+            self._review_answer_label.hide()
+            self._forgot_btn.hide()
+            self._fuzzy_btn.hide()
+            self._known_btn.hide()
+            self._easy_btn.hide()
+            return
+        self._review_status.setText(self._tr("Due now") + f": {len(self._review_words)}")
+        self._review_word_label.show()
+        self._review_context_label.show()
+        self._review_answer_label.show()
+        self._forgot_btn.show()
+        self._fuzzy_btn.show()
+        self._known_btn.show()
+        self._easy_btn.show()
+        self._show_current_review_word()
+
+    def _show_current_review_word(self) -> None:
+        if self._review_index >= len(self._review_words):
+            self._review_status.setText(self._tr("Review complete"))
+            self._review_word_label.setText("")
+            self._review_context_label.setText("")
+            self._review_answer_label.setText("")
+            return
+        word = self._review_words[self._review_index]
+        self._review_word_label.setText(word["word"])
+        context = word.get("context_sentence") or ""
+        self._review_context_label.setText(context if context else self._tr("No context available."))
+        self._review_answer_label.setText(self._tr("Select how well you remembered it."))
+
+    def _grade_current_word(self, quality: int) -> None:
+        if self._review_index >= len(self._review_words):
+            return
+        word = self._review_words[self._review_index]
+        try:
+            self._db.review_word(word["word"], quality)
+        except ValueError:
+            pass
+        self._review_index += 1
+        self._show_current_review_word()
 
     # --- history -------------------------------------------------------------------
 
@@ -504,11 +601,6 @@ class MainWindow(QMainWindow):
         # Floating window group.
         float_group = QGroupBox(self._tr("Floating Window"))
         float_layout = QVBoxLayout(float_group)
-
-        self._hover_orig_check = QCheckBox(self._tr("Hover shows original text"))
-        self._hover_orig_check.setChecked(self._config_get("floating_window.hover_show_original", True))
-        self._hover_orig_check.toggled.connect(lambda v: self._config_set("floating_window.hover_show_original", v))
-        float_layout.addWidget(self._hover_orig_check)
 
         self._show_orig_check = QCheckBox(self._tr("Show original during translation"))
         self._show_orig_check.setChecked(self._config_get("floating_window.show_original_section", False))
@@ -629,4 +721,5 @@ class MainWindow(QMainWindow):
     def refresh_all(self) -> None:
         self.refresh_dashboard()
         self.refresh_vocabulary()
+        self.refresh_review()
         self.refresh_history()

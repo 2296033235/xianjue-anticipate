@@ -181,19 +181,22 @@ class Database:
     def add_history(
         self, source: str, target: str, source_lang: str, target_lang: str, engine: str
     ) -> None:
-        conn = self._ensure_connection()
-        conn.execute(
-            "INSERT INTO history (source_text, target_text, source_lang, target_lang, engine, created_at) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (source, target, source_lang, target_lang, engine, time.time()),
-        )
-        conn.commit()
-        # Cap at 1000 entries.
-        conn.execute(
-            "DELETE FROM history WHERE id NOT IN "
-            "(SELECT id FROM history ORDER BY created_at DESC LIMIT 1000)"
-        )
-        conn.commit()
+        try:
+            conn = self._ensure_connection()
+            conn.execute(
+                "INSERT INTO history (source_text, target_text, source_lang, target_lang, engine, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (source, target, source_lang, target_lang, engine, time.time()),
+            )
+            conn.commit()
+            # Cap at 1000 entries.
+            conn.execute(
+                "DELETE FROM history WHERE id NOT IN "
+                "(SELECT id FROM history ORDER BY created_at DESC LIMIT 1000)"
+            )
+            conn.commit()
+        except Exception:
+            pass
 
     def get_history(self, limit: int = 50) -> list[dict]:
         conn = self._ensure_connection()

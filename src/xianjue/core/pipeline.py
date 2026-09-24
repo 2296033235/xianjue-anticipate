@@ -114,8 +114,8 @@ class TranslationPipeline:
         def _do_translate():
             print(f"[pipeline] translating ({source_lang} -> {target_lang}): {repaired[:40]}...", flush=True)
             try:
-                # Quick mode for the floating window (fast, plain translation).
-                result = self._provider.translate(repaired, source_lang, target_lang, detailed=False)
+                # Detailed mode for clipboard translate (includes key terms for learning).
+                result = self._provider.translate(repaired, source_lang, target_lang, detailed=True)
                 # Only deliver if no newer request has been made.
                 with self._lock:
                     is_current = (current_gen == self._request_generation)

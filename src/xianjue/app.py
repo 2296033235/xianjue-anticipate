@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import QObject, Signal
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from .core.config import Config
 from .core.pipeline import TranslationPipeline
@@ -54,6 +54,7 @@ class XianJueApp:
             config_get=self.config_get,
             config_set=self.config_set,
         )
+        self.floating_window.word_marked.connect(self._mark_word_from_floating_window)
 
         # Translation pipeline.
         self.provider = create_provider(self.config_get)
@@ -109,6 +110,43 @@ class XianJueApp:
                 self._caller.call(lambda: self.main_window.show_manual_error(error_str))
 
         threading.Thread(target=worker, daemon=True).start()
+
+    def _mark_word_from_floating_window(self, selected_text: str, context_sentence: str) -> None:
+        """Store a selected word or short phrase from the floating window."""
+        text = selected_text.strip()
+        if not text:
+            return
+        tokens = text.split()
+        lemma = text.lower() if len(tokens) > 1 else self._get_lemma(tokens[0])
+        added = self.db.add_word(
+            word=text,
+            lemma=lemma,
+            context_sentence=context_sentence.strip(),
+            source="floating",
+        )
+        if added:
+            self.tray.showMessage(
+                "XianJue",
+                f"Added to vocabulary: {text}",
+                QSystemTrayIcon.MessageIcon.Information,
+                2000,
+            )
+
+    @staticmethod
+    def _get_lemma(word: str) -> str:
+        try:
+            from lemminflect import getLemma
+            lowered = word.lower()
+            candidate = getLemma(lowered, "NOUN")
+            if candidate and candidate[0] != lowered:
+                return candidate[0]
+            for pos in ["VERB", "ADJ"]:
+                candidate = getLemma(lowered, pos)
+                if candidate and candidate[0] != lowered:
+                    return candidate[0]
+            return lowered
+        except Exception:
+            return word.lower()
 
     def _toggle_floating(self) -> None:
         if self.floating_window.isVisible():

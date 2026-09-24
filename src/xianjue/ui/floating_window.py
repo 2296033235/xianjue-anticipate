@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QTextBrowser, QSizePolicy, QApplication,
 )
+from PySide6.QtWidgets import QMenu
 
 from ..providers.base import TranslationResult
 from .i18n import tr as _tr_fn
@@ -61,10 +62,6 @@ QPushButton#controlBtn {
 QPushButton#controlBtn:hover {
     background: rgba(255, 255, 255, 30);
     color: #FFFFFF;
-}
-QPushButton#pinBtnActive {
-    background: rgba(80, 130, 220, 80);
-    color: #70B0FF;
 }
 QLabel#engineLabel {
     color: rgba(140, 160, 200, 100);
@@ -141,18 +138,9 @@ class FloatingWindow(QWidget):
         layout.setContentsMargins(1, 1, 1, 1)
         layout.setSpacing(0)
 
-        # Top bar: pin | density | close
+        # Top bar: density | close
         top_bar = QHBoxLayout()
         top_bar.setContentsMargins(8, 2, 8, 2)
-
-        self._pin_btn = QPushButton(self._tr("Pin"))
-        self._pin_btn.setObjectName("controlBtn")
-        if self._pinned:
-            self._pin_btn.setObjectName("pinBtnActive")
-            self._pin_btn.setText(self._tr("Pinned"))
-        self._pin_btn.setToolTip(self._tr("Pin: keep window visible"))
-        self._pin_btn.clicked.connect(self._toggle_pin)
-        top_bar.addWidget(self._pin_btn)
 
         self._density_btn = QPushButton(self._tr("Detail") if self._density == "compact" else self._tr("Simple"))
         self._density_btn.setObjectName("controlBtn")
@@ -179,26 +167,20 @@ class FloatingWindow(QWidget):
         self._text_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self._text_area.setReadOnly(True)
         self._text_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self._text_area.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self._text_area.customContextMenuRequested.connect(self._show_text_context_menu)
         layout.addWidget(self._text_area)
-
-        # Detailed sections (hidden in compact mode).
-        self._detail_widget = QWidget()
-        detail_layout = QVBoxLayout(self._detail_widget)
-        detail_layout.setContentsMargins(0, 0, 0, 0)
-        detail_layout.setSpacing(2)
 
         self._terms_label = QLabel()
         self._terms_label.setObjectName("detailSection")
         self._terms_label.setWordWrap(True)
-        detail_layout.addWidget(self._terms_label)
+        layout.addWidget(self._terms_label)
 
         self._pairs_label = QLabel()
         self._pairs_label.setObjectName("detailSection")
         self._pairs_label.setWordWrap(True)
-        detail_layout.addWidget(self._pairs_label)
-
-        self._detail_widget.setVisible(False)
-        layout.addWidget(self._detail_widget)
+        self._pairs_label.setVisible(False)
+        layout.addWidget(self._pairs_label)
 
         # Original text section (toggleable).
         self._original_label = QLabel()
@@ -299,6 +281,21 @@ class FloatingWindow(QWidget):
 
         self.move(x, y)
 
+    # --- vocabulary marking -----------------------------------------------------
+
+    def _show_text_context_menu(self, pos) -> None:
+        """Show the standard text menu plus a vocabulary marking action."""
+        selected = self._text_area.textCursor().selectedText().strip()
+        if not selected:
+            return
+        menu = self._text_area.createStandardContextMenu()
+        menu.addSeparator()
+        mark_action = menu.addAction(self._tr("Mark as Vocabulary"))
+        mark_action.triggered.connect(
+            lambda: self.word_marked.emit(selected, self._current_source)
+        )
+        menu.exec(self._text_area.mapToGlobal(pos))
+
     # --- auto-hide countdown ----------------------------------------------------
 
     def _tr(self, text: str) -> str:
@@ -332,26 +329,11 @@ class FloatingWindow(QWidget):
 
     # --- controls ----------------------------------------------------------------
 
-    def _toggle_pin(self) -> None:
-        self._pinned = not self._pinned
-        self._config_set("floating_window.pinned", self._pinned)
-        if self._pinned:
-            self._pin_btn.setObjectName("pinBtnActive")
-            self._pin_btn.setText(self._tr("Pinned"))
-            self._auto_hide_timer.stop()
-        else:
-            self._pin_btn.setObjectName("controlBtn")
-            self._pin_btn.setText(self._tr("Pin"))
-            self._start_countdown()
-        # Refresh stylesheet.
-        self._pin_btn.style().unpolish(self._pin_btn)
-        self._pin_btn.style().polish(self._pin_btn)
-
     def _toggle_density(self) -> None:
         self._density = "detailed" if self._density == "compact" else "compact"
         self._config_set("floating_window.density", self._density)
         show_detail = (self._density == "detailed")
-        self._detail_widget.setVisible(show_detail)
+        self._terms_label.setVisible(show_detail)
         self._density_btn.setText(self._tr("Simple") if show_detail else self._tr("Detail"))
         # Force recalc.
         self.adjustSize()
