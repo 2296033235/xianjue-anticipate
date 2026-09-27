@@ -224,6 +224,7 @@ class MainWindow(QMainWindow):
     """Primary application window."""
 
     model_status_ready = Signal(bool, str)
+    ollama_models_ready = Signal(list, str)
 
     def __init__(
         self,
@@ -244,6 +245,7 @@ class MainWindow(QMainWindow):
         self._on_translate_manual = on_translate_manual
         self._refresh_provider = refresh_provider
         self.model_status_ready.connect(self._set_model_status)
+        self.ollama_models_ready.connect(self._refresh_ollama_models)
 
         # UI language: read once, labels are built in the chosen language.
         self._lang = config("ui.language", "zh")
@@ -941,6 +943,9 @@ class MainWindow(QMainWindow):
         self._update_ollama_fields_visibility()
         self._update_current_model_label()
         self._refresh_provider()
+        self._set_model_status(False, self._tr("Not tested"))
+        if index == 1:
+            self._detect_ollama_models()
 
     def _update_cloud_fields_visibility(self) -> None:
         is_custom = self._model_type_combo.currentIndex() == 0
@@ -1199,19 +1204,25 @@ class MainWindow(QMainWindow):
 
         def worker():
             provider = OllamaProvider(host=host, model="")
-            models = provider.list_models()
-            QTimer.singleShot(0, lambda: self._refresh_ollama_models(models))
+            models, error, _ = provider.list_models_detailed()
+            self.ollama_models_ready.emit(models, error)
 
         threading.Thread(target=worker, daemon=True).start()
 
-    def _refresh_ollama_models(self, models: list[str]) -> None:
+    def _refresh_ollama_models(self, models: list[str], error: str = "") -> None:
         self._ollama_models_table.blockSignals(True)
         self._ollama_models_table.setRowCount(len(models))
         for row, model in enumerate(models):
             self._ollama_models_table.setItem(row, 0, QTableWidgetItem(model))
         self._ollama_models_table.blockSignals(False)
 
-        if models:
+        if error:
+            self._set_ollama_models_status(self._tr("Connection failed") + f": {error}")
+        elif models:
+            if self._config_get("model.local.model", "") not in models:
+                self._config_set("model.local.model", models[0])
+                self._update_current_model_label()
+                self._refresh_provider()
             self._set_ollama_models_status("")
         else:
             self._set_ollama_models_status(self._tr("No Ollama models found"))

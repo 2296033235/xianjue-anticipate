@@ -250,6 +250,24 @@ def test_cloud_fields_show_and_ollama_fields_hide(window):
     assert window._ollama_card.isVisibleTo(window._settings_stack)
 
 
+def test_ollama_refresh_updates_models_and_selects_valid_model(window, monkeypatch):
+    refresh_calls = []
+    monkeypatch.setattr(window, "_refresh_provider", lambda: refresh_calls.append(True))
+
+    window._refresh_ollama_models(["qwen3.5:latest", "qwen3.8:27b"], "")
+
+    assert window._config_get("model.local.model") == "qwen3.5:latest"
+    assert window._saved_config_rows == []
+    assert refresh_calls
+
+
+def test_ollama_refresh_shows_error(window):
+    window._refresh_ollama_models([], "Ollama request failed")
+
+    assert window._ollama_models_table.rowCount() == 1
+    assert "Ollama request failed" in window._ollama_models_table.item(0, 0).text()
+
+
 def test_custom_provider_uses_saved_base_url():
     config_values = {
         "model.provider": "custom",

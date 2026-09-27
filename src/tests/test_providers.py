@@ -37,6 +37,40 @@ class TestOllamaConnection:
         except Exception:
             pytest.skip("Ollama not running")
 
+    def test_list_models_detailed_reports_models(self, monkeypatch):
+        provider = OllamaProvider(host="http://localhost:11434")
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"models": [{"name": "qwen3.5:latest"}]}
+
+        monkeypatch.setattr("httpx.get", lambda *args, **kwargs: FakeResponse())
+
+        models, error, latency_ms = provider.list_models_detailed()
+
+        assert models == ["qwen3.5:latest"]
+        assert error == ""
+        assert latency_ms >= 0
+
+    def test_list_models_detailed_reports_error(self, monkeypatch):
+        provider = OllamaProvider(host="http://localhost:11434")
+
+        class FakeResponse:
+            status_code = 500
+
+            def json(self):
+                return {"error": "Ollama request failed"}
+
+        monkeypatch.setattr("httpx.get", lambda *args, **kwargs: FakeResponse())
+
+        models, error, latency_ms = provider.list_models_detailed()
+
+        assert models == []
+        assert error == "Ollama request failed"
+        assert latency_ms >= 0
+
 
 class TestCustomCloudProvider:
     def test_connection_detailed_reports_success_and_latency(self, monkeypatch):

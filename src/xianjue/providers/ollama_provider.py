@@ -47,21 +47,33 @@ class OllamaProvider(LLMProvider):
 
     def list_models(self) -> list[str]:
         """Return installed model names."""
+        models, _, _ = self.list_models_detailed()
+        return models
+
+    def list_models_detailed(self) -> tuple[list[str], str, float]:
+        """Return installed models, error message, and latency."""
+        start = time.monotonic()
         try:
             resp = httpx.get(f"{self._host}/api/tags", timeout=3.0)
             if resp.status_code != 200:
-                return []
-            data = resp.json()
-            return [m["name"] for m in data.get("models", [])]
-        except Exception:
-            return []
+                data = resp.json()
+                message = str(data.get("error") or "Ollama request failed")
+                return [], message, int((time.monotonic() - start) * 1000)
+            models = [m["name"] for m in resp.json().get("models", [])]
+            return models, "", int((time.monotonic() - start) * 1000)
+        except Exception as exc:
+            return [], str(exc), int((time.monotonic() - start) * 1000)
+
+    def test_connection_detailed(self) -> tuple[bool, str, float]:
+        models, error, _ = self.list_models_detailed()
+        return bool(models), error, 0
 
     def translate(
         self,
         text: str,
         source_lang: str = "auto",
         target_lang: str = "zh",
-        timeout: float = 30.0,
+        timeout: float = 60.0,
         detailed: bool = False,
     ) -> TranslationResult:
         start = time.monotonic()
