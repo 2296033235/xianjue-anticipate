@@ -809,6 +809,7 @@ class MainWindow(QMainWindow):
         self._model_status_label.setObjectName("statusChip")
         current_row.addWidget(self._model_status_label)
         current_layout.addLayout(current_row)
+        self._model_status_label.hide()
 
         # --- custom cloud model ---------------------------------------------
         self._cloud_card, cloud_layout = self._make_card(
@@ -949,7 +950,7 @@ class MainWindow(QMainWindow):
         self._update_ollama_fields_visibility()
         self._update_current_model_label()
         self._refresh_provider()
-        self._set_model_status(False, self._tr("Not tested"))
+        self._model_status_label.setVisible(index == 0)
         if index == 1:
             self._detect_ollama_models()
 
@@ -1216,6 +1217,7 @@ class MainWindow(QMainWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def _refresh_ollama_models(self, models: list[str], error: str = "") -> None:
+        self._model_status_label.hide()
         active_model = self._config_get("model.local.model", "")
         if models and active_model not in models:
             active_model = models[0]
@@ -1263,13 +1265,30 @@ class MainWindow(QMainWindow):
 
     def _on_ollama_model_toggled(self, model: str, row: int, checked: bool) -> None:
         if checked:
-            self._ollama_models_table.blockSignals(True)
-            self._ollama_models_table.selectRow(row)
-            self._ollama_models_table.blockSignals(False)
             self._config_set("model.provider", "local")
             self._config_set("model.local.model", model)
-            self._update_current_model_label()
-            self._refresh_provider()
+        elif self._config_get("model.local.model", "") == model:
+            self._config_set("model.local.model", None)
+
+        self._ollama_models_table.blockSignals(True)
+        self._ollama_models_table.selectRow(row if checked else -1)
+        self._ollama_models_table.blockSignals(False)
+        self._apply_active_ollama_row_state()
+        self._update_current_model_label()
+        self._refresh_provider()
+
+    def _apply_active_ollama_row_state(self) -> None:
+        active_model = self._config_get("model.local.model", "")
+        for row in range(self._ollama_models_table.rowCount()):
+            item = self._ollama_models_table.item(row, 0)
+            if not item:
+                continue
+            cell = self._ollama_models_table.cellWidget(row, 1)
+            toggle = cell.layout().itemAt(0).widget()
+            is_active = item.text() == active_model
+            toggle.blockSignals(True)
+            toggle.setValue(1 if is_active else 0)
+            toggle.blockSignals(False)
 
     def _on_ollama_model_selected(self) -> None:
         row = self._ollama_models_table.currentRow()
@@ -1284,6 +1303,7 @@ class MainWindow(QMainWindow):
         self._config_set("model.provider", "local")
         self._config_set("model.local.model", model)
         self._update_current_model_label()
+        self._apply_active_ollama_row_state()
         self._refresh_provider()
 
     # --- settings callbacks --------------------------------------------------------

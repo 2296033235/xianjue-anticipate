@@ -263,6 +263,7 @@ def test_ollama_refresh_updates_models_and_selects_valid_model(window, monkeypat
     assert window._ollama_models_table.cellWidget(0, 1).layout().itemAt(0).widget().value() == 1
     assert window._ollama_models_table.cellWidget(1, 1).layout().itemAt(0).widget().value() == 0
     assert window._config_get("model.local.model") == "qwen3.5:latest"
+    assert not window._model_status_label.isVisibleTo(window._settings_stack)
     assert window._saved_config_rows == []
     assert refresh_calls
 
@@ -302,6 +303,23 @@ def test_ollama_switch_between_detected_models(window, monkeypatch):
     assert isinstance(provider, OllamaProvider)
     assert provider._model == "qwen3.8:27b"
     assert refresh_calls
+
+
+def test_ollama_models_are_single_select(window):
+    window._config_set("model.provider", "local")
+    window._refresh_ollama_models(["qwen3.5:latest", "qwen3.8:27b", "qwen3.5:0.8b"], "")
+
+    window._on_ollama_model_toggled("qwen3.5:latest", 0, True)
+    window._on_ollama_model_toggled("qwen3.8:27b", 1, True)
+
+    toggles = [
+        window._ollama_models_table.cellWidget(row, 1).layout().itemAt(0).widget()
+        for row in range(3)
+    ]
+    assert toggles[0].value() == 0
+    assert toggles[1].value() == 1
+    assert toggles[2].value() == 0
+    assert window._config_get("model.local.model") == "qwen3.8:27b"
 
 
 def test_toggle_switch_clicks_change_value():
