@@ -880,9 +880,13 @@ class MainWindow(QMainWindow):
         models_header.addWidget(refresh_btn)
         models_layout.addLayout(models_header)
 
-        self._ollama_models_table = QTableWidget(0, 1)
-        self._ollama_models_table.setHorizontalHeaderLabels([self._tr("Model Name")])
+        self._ollama_models_table = QTableWidget(0, 2)
+        self._ollama_models_table.setHorizontalHeaderLabels([
+            self._tr("Model Name"),
+            self._tr("Actions"),
+        ])
         self._ollama_models_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._ollama_models_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
         self._ollama_models_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._ollama_models_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._ollama_models_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -1210,30 +1214,53 @@ class MainWindow(QMainWindow):
         threading.Thread(target=worker, daemon=True).start()
 
     def _refresh_ollama_models(self, models: list[str], error: str = "") -> None:
+        active_model = self._config_get("model.local.model", "")
+        if models and active_model not in models:
+            active_model = models[0]
+            self._config_set("model.local.model", active_model)
+            self._update_current_model_label()
+            self._refresh_provider()
+
         self._ollama_models_table.blockSignals(True)
         self._ollama_models_table.setRowCount(len(models))
         for row, model in enumerate(models):
-            self._ollama_models_table.setItem(row, 0, QTableWidgetItem(model))
+            item = QTableWidgetItem(model)
+            item.setFlags(Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled)
+            self._ollama_models_table.setItem(row, 0, item)
+
+            toggle = ToggleSwitch()
+            toggle.setObjectName("modelToggle")
+            toggle.setFixedSize(42, 22)
+            toggle.setValue(1 if model == active_model else 0)
+            toggle.valueChanged.connect(
+                lambda value, model=model, row=row: self._on_ollama_model_toggled(model, row, bool(value))
+            )
+            self._ollama_models_table.setCellWidget(row, 1, toggle)
+
         self._ollama_models_table.blockSignals(False)
 
         if error:
             self._set_ollama_models_status(self._tr("Connection failed") + f": {error}")
-        elif models:
-            if self._config_get("model.local.model", "") not in models:
-                self._config_set("model.local.model", models[0])
-                self._update_current_model_label()
-                self._refresh_provider()
-        else:
+        elif not models:
             self._set_ollama_models_status(self._tr("No Ollama models found"))
 
     def _set_ollama_models_status(self, message: str) -> None:
         if message:
-            self._ollama_models_table.setRowCount(0)
             self._ollama_models_table.setRowCount(1)
             self._ollama_models_table.setItem(0, 0, QTableWidgetItem(message))
             self._ollama_models_table.item(0, 0).setFlags(Qt.ItemFlag.ItemIsEnabled)
         else:
             self._ollama_models_table.setRowCount(0)
+
+    def _on_ollama_model_toggled(self, model: str, row: int, checked: bool) -> None:
+        if checked:
+            self._ollama_models_table.blockSignals(True)
+            self._ollama_models_table.selectRow(row)
+            self._ollama_models_table.blockSignals(False)
+            self._config_set("model.provider", "local")
+            self._config_set("model.local.model", model)
+            self._update_current_model_label()
+            self._refresh_provider()
 
     def _on_ollama_model_selected(self) -> None:
         row = self._ollama_models_table.currentRow()

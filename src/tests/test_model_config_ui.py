@@ -259,6 +259,8 @@ def test_ollama_refresh_updates_models_and_selects_valid_model(window, monkeypat
     assert window._ollama_models_table.rowCount() == 2
     assert window._ollama_models_table.item(0, 0).text() == "qwen3.5:latest"
     assert window._ollama_models_table.item(1, 0).text() == "qwen3.8:27b"
+    assert window._ollama_models_table.cellWidget(0, 1).value() == 1
+    assert window._ollama_models_table.cellWidget(1, 1).value() == 0
     assert window._config_get("model.local.model") == "qwen3.5:latest"
     assert window._saved_config_rows == []
     assert refresh_calls
@@ -269,6 +271,17 @@ def test_ollama_refresh_shows_error(window):
 
     assert window._ollama_models_table.rowCount() == 1
     assert "Ollama request failed" in window._ollama_models_table.item(0, 0).text()
+
+
+def test_ollama_toggle_selects_model(window, monkeypatch):
+    refresh_calls = []
+    monkeypatch.setattr(window, "_refresh_provider", lambda: refresh_calls.append(True))
+
+    window._on_ollama_model_toggled("qwen3.5:latest", 1, True)
+
+    assert window._config_get("model.provider") == "local"
+    assert window._config_get("model.local.model") == "qwen3.5:latest"
+    assert refresh_calls
 
 
 def test_custom_provider_uses_saved_base_url():
