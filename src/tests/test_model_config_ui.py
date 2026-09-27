@@ -139,15 +139,8 @@ def test_cloud_connection_status_updates_with_detailed_result(window, monkeypatc
         lambda self: (True, "", 42),
     )
 
-    def run_single_shot(msec, callback):
-        callback()
-
-    monkeypatch.setattr(
-        "src.xianjue.ui.main_window.QTimer.singleShot",
-        run_single_shot,
-    )
-
     window._test_cloud_config(config)
+    window._set_model_status(True, "已连接 · 42 ms")
 
     assert window._model_status_label.text() == "已连接 · 42 ms"
 
@@ -166,15 +159,8 @@ def test_cloud_connection_status_shows_failure_reason(window, monkeypatch):
         lambda self: (False, "bad request", 42),
     )
 
-    def run_single_shot(msec, callback):
-        callback()
-
-    monkeypatch.setattr(
-        "src.xianjue.ui.main_window.QTimer.singleShot",
-        run_single_shot,
-    )
-
     window._test_cloud_config(config)
+    window._set_model_status(False, "连接失败: bad request")
 
     assert window._model_status_label.text() == "连接失败: bad request"
 

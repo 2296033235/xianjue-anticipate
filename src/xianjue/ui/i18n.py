@@ -45,6 +45,7 @@ _LABELS_ZH = {
     "Please enter a config name": "请填写配置名称",
     "Please enter a model name": "请填写模型名称",
     "Unknown error": "未知错误",
+    "Testing...": "正在测试...",
     "Ollama not configured": "Ollama 未配置",
     "No model configured": "未配置模型",
     "Source": "原文",

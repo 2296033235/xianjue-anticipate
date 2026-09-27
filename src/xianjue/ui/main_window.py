@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QPushButton, QLabel, QComboBox, QSlider, QLineEdit, QCheckBox, QFrame,
@@ -223,6 +223,8 @@ _TRASH_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" vi
 class MainWindow(QMainWindow):
     """Primary application window."""
 
+    model_status_ready = Signal(bool, str)
+
     def __init__(
         self,
         config: Callable,
@@ -241,6 +243,7 @@ class MainWindow(QMainWindow):
         self._db = db
         self._on_translate_manual = on_translate_manual
         self._refresh_provider = refresh_provider
+        self.model_status_ready.connect(self._set_model_status)
 
         # UI language: read once, labels are built in the chosen language.
         self._lang = config("ui.language", "zh")
@@ -1143,6 +1146,7 @@ class MainWindow(QMainWindow):
     def _test_saved_cloud_connection(self, row: int) -> None:
         configs = self._config_get("model.saved_cloud_configs", [])
         if 0 <= row < len(configs):
+            self._set_model_status(True, self._tr("Testing..."))
             self._test_cloud_config(configs[row])
 
     def _test_cloud_config(self, config: dict) -> None:
@@ -1171,7 +1175,7 @@ class MainWindow(QMainWindow):
                 if ok
                 else f"{self._tr('Connection failed')}: {error or self._tr('Unknown error')}"
             )
-            QTimer.singleShot(0, lambda: self._set_model_status(ok, message))
+            self.model_status_ready.emit(ok, message)
 
         threading.Thread(target=worker, daemon=True).start()
 
