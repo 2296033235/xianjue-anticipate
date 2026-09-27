@@ -1223,7 +1223,6 @@ class MainWindow(QMainWindow):
                 self._config_set("model.local.model", models[0])
                 self._update_current_model_label()
                 self._refresh_provider()
-            self._set_ollama_models_status("")
         else:
             self._set_ollama_models_status(self._tr("No Ollama models found"))
 

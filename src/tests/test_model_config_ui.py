@@ -256,6 +256,9 @@ def test_ollama_refresh_updates_models_and_selects_valid_model(window, monkeypat
 
     window._refresh_ollama_models(["qwen3.5:latest", "qwen3.8:27b"], "")
 
+    assert window._ollama_models_table.rowCount() == 2
+    assert window._ollama_models_table.item(0, 0).text() == "qwen3.5:latest"
+    assert window._ollama_models_table.item(1, 0).text() == "qwen3.8:27b"
     assert window._config_get("model.local.model") == "qwen3.5:latest"
     assert window._saved_config_rows == []
     assert refresh_calls
