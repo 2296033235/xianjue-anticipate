@@ -73,6 +73,56 @@ class TestCustomCloudProvider:
         assert error == "bad request"
         assert latency_ms >= 0
 
+    def test_connection_detailed_shows_http_error_code(self, monkeypatch):
+        provider = CustomCloudProvider(
+            api_key="test-key",
+            model="demo-model",
+            base_url="https://api.example.com/anthropic",
+            api_format="anthropic_messages",
+        )
+
+        class FakeResponse:
+            status_code = 401
+            text = ""
+
+            def json(self):
+                return {
+                    "error": {
+                        "type": "invalid_request_error",
+                        "message": "invalid api key",
+                    }
+                }
+
+        monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+        ok, error, latency_ms = provider.test_connection_detailed()
+
+        assert ok is False
+        assert error == "HTTP 401 · invalid_request_error · invalid api key"
+        assert latency_ms >= 0
+
+    def test_connection_detailed_shows_empty_response_code(self, monkeypatch):
+        provider = CustomCloudProvider(
+            api_key="test-key",
+            model="demo-model",
+            base_url="https://api.example.com/anthropic",
+            api_format="anthropic_messages",
+        )
+
+        class FakeResponse:
+            status_code = 200
+
+            def json(self):
+                return {"content": []}
+
+        monkeypatch.setattr("httpx.post", lambda *args, **kwargs: FakeResponse())
+
+        ok, error, latency_ms = provider.test_connection_detailed()
+
+        assert ok is False
+        assert error == "HTTP 200 · Empty response"
+        assert latency_ms >= 0
+
     def test_translate_parses_structured_response(self, monkeypatch):
         provider = CustomCloudProvider(
             api_key="test-key",

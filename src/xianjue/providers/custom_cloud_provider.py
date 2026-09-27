@@ -116,14 +116,62 @@ class CustomCloudProvider(LLMProvider):
             json=payload,
             timeout=timeout,
         )
-        response.raise_for_status()
+        status_code = response.status_code
+        if status_code >= 400:
+            data = response.json()
+            code, message = self._error_fields(data)
+            raise ValueError(
+                self._format_api_error(
+                    status_code,
+                    code,
+                    message,
+                    response.text or "API error",
+                )
+            )
+
         data = response.json()
         content = data.get("content", [])
-        return "".join(
+        raw = "".join(
             part.get("text", "")
             for part in content
             if isinstance(part, dict) and part.get("type") == "text"
         )
+        if raw:
+            return raw
+
+        code, message = self._error_fields(data)
+        raise ValueError(
+            self._format_api_error(status_code, code, message, "Empty response")
+        )
+
+    @staticmethod
+    def _error_fields(data: object) -> tuple[str, str]:
+        if not isinstance(data, dict):
+            return "", ""
+        error = data.get("error")
+        if not isinstance(error, dict):
+            if error:
+                return str(error), ""
+            return "", ""
+        code = str(error.get("code") or error.get("type") or "")
+        message = str(error.get("message") or "")
+        return code, message
+
+    @staticmethod
+    def _format_api_error(
+        status_code: int,
+        code: str,
+        message: str,
+        fallback: str,
+    ) -> str:
+        parts = [f"HTTP {status_code}"]
+        if code:
+            parts.append(code)
+        if message:
+            parts.append(message)
+        if not code and not message:
+            parts.append(fallback)
+        return " · ".join(parts)
 
     def _request(
         self,
@@ -162,7 +210,7 @@ class CustomCloudProvider(LLMProvider):
             return bool(raw), "" if raw else "Empty response", latency_ms
         except Exception as exc:
             latency_ms = int((time.monotonic() - start) * 1000)
-            return False, str(exc), latency_ms
+            return False, self._format_exception_error(exc), latency_ms
 
     def translate(
         self,
@@ -207,3 +255,15 @@ class CustomCloudProvider(LLMProvider):
             engine=self.name,
             latency=time.monotonic() - start,
         )
+
+    @staticmethod
+    def _format_exception_error(exc: Exception) -> str:
+        status_code = getattr(exc, "status_code", None)
+        if status_code is None:
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+
+        detail = str(exc).strip() or "Unknown error"
+        if status_code and f"HTTP {status_code}" not in detail:
+            detail = f"HTTP {status_code} · {detail}"
+        return detail
