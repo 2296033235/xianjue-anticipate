@@ -110,14 +110,29 @@ QLabel#modelConfigSubtitle {
     color: #8A8A98;
     font-size: 12px;
 }
-QToolButton#modelToggle {
-    width: 42px;
+QSlider#modelToggle {
+    min-height: 22px;
+    max-height: 22px;
+    background-color: transparent;
+}
+QSlider#modelToggle::groove:horizontal {
     height: 22px;
     border-radius: 11px;
-    background-color: rgba(255, 255, 255, 0.12);
+    background-color: #C9CDD6;
 }
-QToolButton#modelToggle:checked {
-    background-color: #5FD59F;
+QSlider#modelToggle::sub-page:horizontal {
+    background-color: #C9CDD6;
+    border-radius: 11px;
+}
+QSlider#modelToggle::add-page:horizontal {
+    background-color: #C9CDD6;
+    border-radius: 11px;
+}
+QSlider#modelToggle::handle:horizontal {
+    width: 18px;
+    margin: 2px;
+    border-radius: 9px;
+    background-color: white;
 }
 QPushButton#modelActionBtn {
     background-color: rgba(95, 213, 159, 0.18);
@@ -839,9 +854,6 @@ class MainWindow(QMainWindow):
         self._cloud_model_input.setPlaceholderText("gpt-4o-mini")
         cloud_form.addRow(self._tr("Model Name"), self._cloud_model_input)
 
-        self._config_name_input = QLineEdit()
-        self._config_name_input.setPlaceholderText("My model")
-        cloud_form.addRow(self._tr("Config Name"), self._config_name_input)
         cloud_layout.addLayout(cloud_form)
 
         cloud_buttons = QHBoxLayout()
@@ -962,16 +974,16 @@ class MainWindow(QMainWindow):
 
     def _cloud_config_from_form(self) -> dict:
         option = _API_FORMAT_OPTIONS[self._api_format_combo.currentIndex()]
+        model = self._cloud_model_input.text().strip()
         return {
-            "name": self._config_name_input.text().strip(),
+            "name": model,
             "api_format": option[0],
             "base_url": self._api_base_input.text().strip(),
             "api_key": self._api_key_input.text().strip(),
-            "model": self._cloud_model_input.text().strip(),
+            "model": model,
         }
 
     def _load_cloud_config_into_form(self, config: dict) -> None:
-        self._config_name_input.setText(config.get("name", ""))
         index = 0
         for row, (format_key, _) in enumerate(_API_FORMAT_OPTIONS):
             if format_key == config.get("api_format", "chat_completions"):
@@ -1019,7 +1031,7 @@ class MainWindow(QMainWindow):
         config: dict,
         row: int,
         is_active: bool,
-    ) -> tuple[QFrame, QToolButton, QPushButton, QPushButton]:
+    ) -> tuple[QFrame, QSlider, QPushButton, QPushButton]:
         row_widget = QFrame()
         row_widget.setObjectName("modelConfigRow")
         row_widget.setProperty("active", is_active)
@@ -1049,12 +1061,13 @@ class MainWindow(QMainWindow):
         text_layout.addWidget(subtitle)
         row_layout.addLayout(text_layout, 1)
 
-        toggle = QToolButton()
+        toggle = QSlider(Qt.Orientation.Horizontal)
         toggle.setObjectName("modelToggle")
+        toggle.setRange(0, 1)
+        toggle.setPageStep(1)
         toggle.setFixedSize(42, 22)
-        toggle.setCheckable(True)
-        toggle.setChecked(is_active)
-        toggle.toggled.connect(lambda checked, index=row: self._set_active_cloud_config(index, checked))
+        toggle.setValue(1 if is_active else 0)
+        toggle.valueChanged.connect(lambda value, index=row: self._set_active_cloud_config(index, bool(value)))
         row_layout.addWidget(toggle)
 
         test_btn = QPushButton(self._tr("Test"))
@@ -1081,6 +1094,12 @@ class MainWindow(QMainWindow):
         if 0 <= row < len(configs):
             self._load_cloud_config_into_form(configs[row])
 
+    def _clear_cloud_form(self) -> None:
+        self._api_format_combo.setCurrentIndex(0)
+        self._api_base_input.clear()
+        self._api_key_input.clear()
+        self._cloud_model_input.clear()
+
     def _set_active_cloud_config(self, row: int, checked: bool) -> None:
         configs = self._config_get("model.saved_cloud_configs", [])
         if row < 0 or row >= len(configs):
@@ -1099,9 +1118,6 @@ class MainWindow(QMainWindow):
 
     def _save_cloud_config(self) -> None:
         config = self._cloud_config_from_form()
-        if not config["name"]:
-            QMessageBox.information(self, self._tr("Save Config"), self._tr("Please enter a config name"))
-            return
         if not config["model"]:
             QMessageBox.information(self, self._tr("Save Config"), self._tr("Please enter a model name"))
             return
@@ -1116,11 +1132,23 @@ class MainWindow(QMainWindow):
         self._refresh_cloud_configs()
         self._update_current_model_label()
         self._refresh_provider()
+        self._clear_cloud_form()
 
     def _delete_cloud_config(self, row: int) -> None:
         configs = self._config_get("model.saved_cloud_configs", [])
         if row < 0 or row >= len(configs):
             return
+
+        confirmed = QMessageBox.question(
+            self,
+            self._tr("Delete"),
+            self._tr("Are you sure you want to delete this model?"),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirmed != QMessageBox.StandardButton.Yes:
+            return
+
         configs.pop(row)
         self._config_set("model.saved_cloud_configs", configs)
         active = self._config_get("model.active_config", 0)

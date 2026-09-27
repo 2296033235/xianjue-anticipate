@@ -3,7 +3,8 @@ from __future__ import annotations
 import pytest
 
 from PySide6.QtWidgets import QApplication
-from PySide6.QtWidgets import QToolButton
+from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QSlider
 
 from src.xianjue.core.config import Config
 from src.xianjue.providers.custom_cloud_provider import CustomCloudProvider
@@ -45,16 +46,22 @@ def test_custom_config_saves_and_applies_active_provider(window):
     window._api_base_input.setText("https://example.com/v1")
     window._api_key_input.setText("test-key")
     window._cloud_model_input.setText("demo-model")
-    window._config_name_input.setText("Demo")
 
     window._save_cloud_config()
     configs = window._config_get("model.saved_cloud_configs")
 
     assert len(window._saved_config_rows) == 1
-    assert configs[0]["name"] == "Demo"
+    assert configs[0]["name"] == "demo-model"
     assert configs[0]["api_format"] == "chat_completions"
     assert window._config_get("model.active_config") == 0
-    assert "Demo" in window._current_model_label.text()
+    assert "demo-model" in window._current_model_label.text()
+    assert window._cloud_model_input.text() == ""
+    assert window._api_key_input.text() == ""
+    assert window._api_base_input.text() == ""
+
+
+def test_config_name_field_is_removed(window):
+    assert not hasattr(window, "_config_name_input")
 
 
 def test_cloud_api_formats(window):
@@ -75,13 +82,12 @@ def test_saved_config_rows_render_action_controls(window):
     window._api_format_combo.setCurrentText("Chat Completions (/chat/completions)")
     window._api_key_input.setText("test-key")
     window._cloud_model_input.setText("demo-model")
-    window._config_name_input.setText("Demo")
     window._save_cloud_config()
 
     assert len(window._saved_config_rows) == 1
     row = window._saved_config_rows[0]
     assert row["row"].property("active") is True
-    assert row["toggle"].isChecked() is True
+    assert row["toggle"].value() == 1
     assert row["test"].text() == "测试"
     assert row["delete"].text() == ""
 
@@ -94,7 +100,6 @@ def test_saved_config_row_tests_saved_values(window, monkeypatch):
     window._model_type_combo.setCurrentIndex(0)
     window._api_key_input.setText("saved-key")
     window._cloud_model_input.setText("saved-model")
-    window._config_name_input.setText("Saved")
     window._save_cloud_config()
 
     window._api_key_input.setText("changed-key")
@@ -153,12 +158,25 @@ def test_factory_reads_active_saved_config():
     assert provider._anthropic_endpoint().endswith("/v1/messages")
 
 
-def test_saved_config_delete(window):
+def test_saved_config_delete(window, monkeypatch):
     window._model_type_combo.setCurrentIndex(0)
     window._api_key_input.setText("test-key")
     window._cloud_model_input.setText("demo-model")
-    window._config_name_input.setText("Demo")
     window._save_cloud_config()
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: QMessageBox.StandardButton.No,
+    )
+    window._delete_cloud_config(0)
+    assert len(window._saved_config_rows) == 1
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: QMessageBox.StandardButton.Yes,
+    )
     window._delete_cloud_config(0)
 
     assert len(window._saved_config_rows) == 0

@@ -22,6 +22,7 @@ _LABELS_ZH = {
     "Model Name": "模型名称",
     "Config Name": "配置名称",
     "Save Config": "保存配置",
+    "Are you sure you want to delete this model?": "确定要删除这个模型吗？",
     "Not tested": "未测试",
     "Connected": "已连接",
     "Connection failed": "连接失败",
