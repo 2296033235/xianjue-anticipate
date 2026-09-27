@@ -1,12 +1,15 @@
 """Unit tests for core modules (text repair, intent filter, language detection)."""
 
 import pytest
+import threading
 
+from src.xianjue.providers.base import TranslationResult
 from src.xianjue.core.text_repair import repair
 from src.xianjue.core.intent_filter import (
     is_url, is_numeric, is_code_like, is_file_path, is_binary_noise, should_skip,
 )
 from src.xianjue.core.language import detect_language
+from src.xianjue.core.pipeline import TranslationPipeline
 
 
 class TestTextRepair:
@@ -86,3 +89,53 @@ class TestLanguageDetection:
     def test_unknown(self):
         assert detect_language("") == "unknown"
         assert detect_language("   ") == "unknown"
+
+
+class TestPipelineProviderSwitching:
+    def test_provider_property_updates_active_provider(self):
+        old_provider = object()
+        new_provider = object()
+        pipeline = TranslationPipeline(
+            config_get=lambda key, default=None: default,
+            provider=old_provider,
+            on_result=lambda *args, **kwargs: None,
+        )
+
+        pipeline.provider = new_provider
+
+        assert pipeline._provider is new_provider
+
+    def test_manual_translation_uses_active_provider(self):
+        class FakeProvider:
+            def translate(
+                self,
+                text: str,
+                source_lang: str = "auto",
+                target_lang: str = "zh",
+                detailed: bool = False,
+            ) -> TranslationResult:
+                return TranslationResult(
+                    translation="你好",
+                    engine=f"Fake ({text})",
+                    structured=detailed,
+                )
+
+        provider = FakeProvider()
+        pipeline = TranslationPipeline(
+            config_get=lambda key, default=None: default,
+            provider=provider,
+            on_result=lambda *args, **kwargs: None,
+        )
+        done = threading.Event()
+        captured = {}
+
+        def on_result(result, source_text):
+            captured["result"] = result
+            captured["source_text"] = source_text
+            done.set()
+
+        pipeline.translate_manual("hello", source_lang="en", target_lang="zh", callback=on_result)
+
+        assert done.wait(2)
+        assert captured["result"].translation == "你好"
+        assert captured["source_text"] == "hello"

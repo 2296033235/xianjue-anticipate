@@ -45,6 +45,15 @@ class TranslationPipeline:
         self._lock = threading.Lock()
 
     @property
+    def provider(self) -> LLMProvider:
+        """The provider used for translation."""
+        return self._provider
+
+    @provider.setter
+    def provider(self, value: LLMProvider) -> None:
+        self._provider = value
+
+    @property
     def monitor(self) -> ClipboardMonitor:
         return self._monitor
 
