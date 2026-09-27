@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QMessageBox
 from PySide6.QtWidgets import QSlider
 
 from src.xianjue.core.config import Config
+from src.xianjue.providers.ollama_provider import OllamaProvider
 from src.xianjue.providers.custom_cloud_provider import CustomCloudProvider
 from src.xianjue.providers.factory import create_provider
 from src.xianjue.ui.toggle_switch import ToggleSwitch
@@ -281,6 +282,25 @@ def test_ollama_toggle_selects_model(window, monkeypatch):
 
     assert window._config_get("model.provider") == "local"
     assert window._config_get("model.local.model") == "qwen3.5:latest"
+    assert refresh_calls
+
+
+def test_ollama_switch_between_detected_models(window, monkeypatch):
+    refresh_calls = []
+    monkeypatch.setattr(window, "_refresh_provider", lambda: refresh_calls.append(True))
+
+    window._config_set("model.provider", "local")
+    window._refresh_ollama_models(["qwen3.5:latest", "qwen3.8:27b"], "")
+    assert window._config_get("model.provider") == "local"
+    assert window._config_get("model.local.model") == "qwen3.5:latest"
+
+    window._on_ollama_model_toggled("qwen3.8:27b", 1, True)
+
+    assert window._config_get("model.provider") == "local"
+    assert window._config_get("model.local.model") == "qwen3.8:27b"
+    provider = create_provider(window._config_get)
+    assert isinstance(provider, OllamaProvider)
+    assert provider._model == "qwen3.8:27b"
     assert refresh_calls
 
 
