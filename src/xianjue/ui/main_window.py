@@ -10,10 +10,11 @@ from PySide6.QtWidgets import (
     QPushButton, QLabel, QComboBox, QSlider, QLineEdit, QCheckBox, QFrame,
     QSpinBox, QGroupBox, QFormLayout, QScrollArea, QTableWidget,
     QTableWidgetItem, QTextEdit, QTabWidget, QHeaderView, QMessageBox,
+    QToolButton,
 )
 
 from .i18n import tr as _tr
-from .nav_button import NAV_ICONS, NavButton
+from .nav_button import NAV_ICONS, NavButton, make_icon
 
 
 _STYLE = """
@@ -86,6 +87,56 @@ QLabel#statusChip {
     color: #5FD59F;
     border-radius: 10px;
     padding: 4px 10px;
+}
+QFrame#modelConfigRow {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+QFrame#modelConfigRow[active="true"] {
+    background-color: rgba(95, 213, 159, 0.10);
+    border: 1px solid rgba(95, 213, 159, 0.60);
+}
+QFrame#modelAvatar {
+    background-color: rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+}
+QLabel#modelConfigTitle {
+    color: #E6EDF3;
+    font-size: 15px;
+    font-weight: bold;
+}
+QLabel#modelConfigSubtitle {
+    color: #8A8A98;
+    font-size: 12px;
+}
+QToolButton#modelToggle {
+    width: 42px;
+    height: 22px;
+    border-radius: 11px;
+    background-color: rgba(255, 255, 255, 0.12);
+}
+QToolButton#modelToggle:checked {
+    background-color: #5FD59F;
+}
+QPushButton#modelActionBtn {
+    background-color: rgba(95, 213, 159, 0.18);
+    color: #5FD59F;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 12px;
+}
+QPushButton#modelActionBtn:hover {
+    background-color: rgba(95, 213, 159, 0.28);
+}
+QPushButton#modelDeleteBtn {
+    background-color: transparent;
+    color: #8A8A98;
+    border: none;
+    padding: 5px;
+}
+QPushButton#modelDeleteBtn:hover {
+    color: #E6EDF3;
 }
 QLabel#pageTitle {
     color: #E0E0E5;
@@ -167,6 +218,14 @@ _PAGE_KEYS = [
     "history",
     "settings",
 ]
+
+_API_FORMAT_OPTIONS = [
+    ("anthropic_messages", "Anthropic Messages (/v1/messages)"),
+    ("chat_completions", "Chat Completions (/chat/completions)"),
+    ("responses", "Responses (/responses)"),
+]
+
+_TRASH_ICON = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><g fill="none" stroke="__COLOR__" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M6 7l1 13h10l1-13"/><path d="M9 7V4h6v3"/></g></svg>'
 
 
 class MainWindow(QMainWindow):
@@ -762,15 +821,15 @@ class MainWindow(QMainWindow):
         cloud_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
 
         self._api_format_combo = QComboBox()
-        self._api_format_combo.addItems([
-            self._tr("OpenAI compatible"),
-            self._tr("DeepSeek API"),
-        ])
+        for _, label in _API_FORMAT_OPTIONS:
+            self._api_format_combo.addItem(label)
+        self._api_format_combo.currentIndexChanged.connect(self._update_api_placeholders)
         cloud_form.addRow(self._tr("API Format"), self._api_format_combo)
 
         self._api_base_input = QLineEdit()
         self._api_base_input.setPlaceholderText("https://api.openai.com/v1")
         cloud_form.addRow(self._tr("API Address"), self._api_base_input)
+        self._update_api_placeholders()
 
         self._api_key_input = QLineEdit()
         self._api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
@@ -789,36 +848,18 @@ class MainWindow(QMainWindow):
         save_btn = QPushButton(self._tr("Save Config"))
         save_btn.setObjectName("primaryBtn")
         save_btn.clicked.connect(self._save_cloud_config)
-        test_btn = QPushButton(self._tr("Test"))
-        test_btn.clicked.connect(self._test_cloud_connection)
         cloud_buttons.addWidget(save_btn)
-        cloud_buttons.addWidget(test_btn)
         cloud_buttons.addStretch()
         cloud_layout.addLayout(cloud_buttons)
 
         self._cloud_configs_card, cloud_configs_layout = self._make_card(
             layout, self._tr("Saved Configs")
         )
-        self._saved_configs_table = QTableWidget(0, 3)
-        self._saved_configs_table.setHorizontalHeaderLabels([
-            self._tr("Config"), self._tr("API Format"),
-            self._tr("Model Name"),
-        ])
-        self._saved_configs_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        self._saved_configs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
-        self._saved_configs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        self._saved_configs_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        self._saved_configs_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        self._saved_configs_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self._saved_configs_table.itemSelectionChanged.connect(self._on_saved_config_selected)
-        cloud_configs_layout.addWidget(self._saved_configs_table)
-
-        config_buttons = QHBoxLayout()
-        delete_btn = QPushButton(self._tr("Delete"))
-        delete_btn.clicked.connect(self._delete_selected_cloud_config)
-        config_buttons.addWidget(delete_btn)
-        config_buttons.addStretch()
-        cloud_configs_layout.addLayout(config_buttons)
+        self._saved_configs_container = QWidget()
+        self._saved_configs_layout = QVBoxLayout(self._saved_configs_container)
+        self._saved_configs_layout.setContentsMargins(0, 0, 0, 0)
+        self._saved_configs_layout.setSpacing(8)
+        cloud_configs_layout.addWidget(self._saved_configs_container)
 
         # --- local Ollama ---------------------------------------------------
         self._ollama_card, ollama_layout = self._make_card(
@@ -860,6 +901,12 @@ class MainWindow(QMainWindow):
 
         layout.addStretch()
         return scroll
+
+    def _update_api_placeholders(self) -> None:
+        if self._api_format_combo.currentIndex() == 0:
+            self._api_base_input.setPlaceholderText("https://api.anthropic.com/v1")
+        else:
+            self._api_base_input.setPlaceholderText("https://api.openai.com/v1")
 
     def _build_app_settings_page(self) -> QWidget:
         scroll, layout = self._make_page(self._tr("App Related"))
@@ -914,9 +961,10 @@ class MainWindow(QMainWindow):
         self._ollama_models_card.setVisible(is_local)
 
     def _cloud_config_from_form(self) -> dict:
+        option = _API_FORMAT_OPTIONS[self._api_format_combo.currentIndex()]
         return {
             "name": self._config_name_input.text().strip(),
-            "api_format": "deepseek" if self._api_format_combo.currentIndex() == 1 else "openai_compatible",
+            "api_format": option[0],
             "base_url": self._api_base_input.text().strip(),
             "api_key": self._api_key_input.text().strip(),
             "model": self._cloud_model_input.text().strip(),
@@ -924,34 +972,128 @@ class MainWindow(QMainWindow):
 
     def _load_cloud_config_into_form(self, config: dict) -> None:
         self._config_name_input.setText(config.get("name", ""))
-        self._api_format_combo.setCurrentIndex(1 if config.get("api_format") == "deepseek" else 0)
+        index = 0
+        for row, (format_key, _) in enumerate(_API_FORMAT_OPTIONS):
+            if format_key == config.get("api_format", "chat_completions"):
+                index = row
+                break
+        self._api_format_combo.setCurrentIndex(index)
         self._api_base_input.setText(config.get("base_url", ""))
         self._api_key_input.setText(config.get("api_key", ""))
         self._cloud_model_input.setText(config.get("model", ""))
 
     def _refresh_cloud_configs(self) -> None:
         configs = self._config_get("model.saved_cloud_configs", [])
-        self._saved_configs_table.blockSignals(True)
-        self._saved_configs_table.setRowCount(len(configs))
-        for row, config in enumerate(configs):
-            self._saved_configs_table.setItem(row, 0, QTableWidgetItem(config.get("name", "")))
-            self._saved_configs_table.setItem(
-                row, 1,
-                QTableWidgetItem(self._tr("DeepSeek API") if config.get("api_format") == "deepseek" else self._tr("OpenAI compatible")),
-            )
-            self._saved_configs_table.setItem(row, 2, QTableWidgetItem(config.get("model", "")))
-        self._saved_configs_table.blockSignals(False)
+        active = self._config_get("model.active_config", None)
+        self._saved_config_rows = []
 
-    def _on_saved_config_selected(self) -> None:
-        row = self._saved_configs_table.currentRow()
-        if row < 0:
-            return
+        while self._saved_configs_layout.count():
+            item = self._saved_configs_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.setParent(None)
+                widget.deleteLater()
+
+        for row, config in enumerate(configs):
+            row_widget, toggle, test_btn, delete_btn = self._make_cloud_config_row(
+                config,
+                row,
+                active == row,
+            )
+            self._saved_configs_layout.addWidget(row_widget)
+            self._saved_config_rows.append({
+                "row": row_widget,
+                "toggle": toggle,
+                "test": test_btn,
+                "delete": delete_btn,
+            })
+
+    def _format_label(self, api_format: str) -> str:
+        for format_key, label in _API_FORMAT_OPTIONS:
+            if format_key == api_format:
+                return label
+        return _API_FORMAT_OPTIONS[1][1]
+
+    def _make_cloud_config_row(
+        self,
+        config: dict,
+        row: int,
+        is_active: bool,
+    ) -> tuple[QFrame, QToolButton, QPushButton, QPushButton]:
+        row_widget = QFrame()
+        row_widget.setObjectName("modelConfigRow")
+        row_widget.setProperty("active", is_active)
+        row_widget.setCursor(Qt.CursorShape.PointingHandCursor)
+        row_widget.mousePressEvent = lambda event, index=row: self._load_cloud_config_row(index)
+
+        row_layout = QHBoxLayout(row_widget)
+        row_layout.setContentsMargins(12, 10, 12, 10)
+        row_layout.setSpacing(12)
+
+        avatar = QFrame()
+        avatar.setObjectName("modelAvatar")
+        avatar.setFixedSize(34, 34)
+        row_layout.addWidget(avatar)
+
+        text_layout = QVBoxLayout()
+        text_layout.setContentsMargins(0, 0, 0, 0)
+        text_layout.setSpacing(2)
+        title = QLabel(config.get("name") or config.get("model", ""))
+        title.setObjectName("modelConfigTitle")
+        subtitle = QLabel(
+            f"{self._format_label(config.get('api_format', 'chat_completions'))} · {config.get('base_url', '')}"
+        )
+        subtitle.setObjectName("modelConfigSubtitle")
+        subtitle.setWordWrap(True)
+        text_layout.addWidget(title)
+        text_layout.addWidget(subtitle)
+        row_layout.addLayout(text_layout, 1)
+
+        toggle = QToolButton()
+        toggle.setObjectName("modelToggle")
+        toggle.setFixedSize(42, 22)
+        toggle.setCheckable(True)
+        toggle.setChecked(is_active)
+        toggle.toggled.connect(lambda checked, index=row: self._set_active_cloud_config(index, checked))
+        row_layout.addWidget(toggle)
+
+        test_btn = QPushButton(self._tr("Test"))
+        test_btn.setObjectName("modelActionBtn")
+        test_btn.clicked.connect(lambda checked=False, index=row: self._test_saved_cloud_connection(index))
+        row_layout.addWidget(test_btn)
+
+        delete_btn = QPushButton()
+        delete_btn.setObjectName("modelDeleteBtn")
+        delete_btn.setIcon(make_icon(_TRASH_ICON, "#8A8A98", 16))
+        delete_btn.setFixedSize(30, 30)
+        delete_btn.clicked.connect(lambda checked=False, index=row: self._delete_cloud_config(index))
+        row_layout.addWidget(delete_btn)
+
+        self._polish_widget(row_widget)
+        return row_widget, toggle, test_btn, delete_btn
+
+    def _polish_widget(self, widget: QWidget) -> None:
+        widget.style().unpolish(widget)
+        widget.style().polish(widget)
+
+    def _load_cloud_config_row(self, row: int) -> None:
         configs = self._config_get("model.saved_cloud_configs", [])
-        if row >= len(configs):
+        if 0 <= row < len(configs):
+            self._load_cloud_config_into_form(configs[row])
+
+    def _set_active_cloud_config(self, row: int, checked: bool) -> None:
+        configs = self._config_get("model.saved_cloud_configs", [])
+        if row < 0 or row >= len(configs):
             return
-        self._load_cloud_config_into_form(configs[row])
-        self._config_set("model.active_config", row)
+
+        active = self._config_get("model.active_config", None)
+        if checked:
+            self._config_set("model.active_config", row)
+        elif active == row:
+            self._config_set("model.active_config", None)
+
         self._config_set("model.provider", "custom")
+        self._refresh_cloud_configs()
         self._update_current_model_label()
         self._refresh_provider()
 
@@ -988,35 +1130,27 @@ class MainWindow(QMainWindow):
         self._update_current_model_label()
         self._refresh_provider()
 
-    def _delete_selected_cloud_config(self) -> None:
-        row = self._saved_configs_table.currentRow()
-        self._delete_cloud_config(row)
-
-    def _test_cloud_connection(self) -> None:
-        self._test_cloud_config(self._cloud_config_from_form())
+    def _test_saved_cloud_connection(self, row: int) -> None:
+        configs = self._config_get("model.saved_cloud_configs", [])
+        if 0 <= row < len(configs):
+            self._test_cloud_config(configs[row])
 
     def _test_cloud_config(self, config: dict) -> None:
         import threading
         import time as _time
-        from ..providers.deepseek_provider import DeepSeekProvider
-        from ..providers.openai_compatible_provider import OpenAICompatibleProvider
+        from ..providers.custom_cloud_provider import CustomCloudProvider
 
         def worker():
             start = _time.monotonic()
             ok = False
             error = ""
             try:
-                if config.get("api_format") == "deepseek":
-                    provider = DeepSeekProvider(
-                        api_key=config.get("api_key", ""),
-                        model=config.get("model", ""),
-                    )
-                else:
-                    provider = OpenAICompatibleProvider(
-                        api_key=config.get("api_key", ""),
-                        model=config.get("model", ""),
-                        base_url=config.get("base_url", ""),
-                    )
+                provider = CustomCloudProvider(
+                    api_key=config.get("api_key", ""),
+                    model=config.get("model", ""),
+                    base_url=config.get("base_url", ""),
+                    api_format=config.get("api_format", "chat_completions"),
+                )
                 ok = provider.test_connection()
             except Exception as exc:
                 error = str(exc)

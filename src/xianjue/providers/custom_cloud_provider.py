@@ -1,0 +1,154 @@
+"""Cloud translation through configurable LLM API formats."""
+
+from __future__ import annotations
+
+import time
+
+import httpx
+from openai import OpenAI
+
+from .base import LLMProvider, TranslationResult
+from .deepseek_provider import _LANG_NAMES, _parse_structured
+from .prompts import TRANSLATION_PROMPT, TRANSLATION_QUICK_PROMPT
+
+
+class CustomCloudProvider(LLMProvider):
+    """Run one of the three cloud request formats supported by the settings UI."""
+
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        base_url: str,
+        api_format: str = "chat_completions",
+    ) -> None:
+        self._api_key = api_key
+        self._model = model
+        self._base_url = base_url.rstrip("/")
+        self._api_format = api_format
+
+    @property
+    def name(self) -> str:
+        return f"Custom ({self._model})"
+
+    @property
+    def api_format(self) -> str:
+        return self._api_format
+
+    def _sdk_base_url(self) -> str:
+        base = self._base_url.rstrip("/")
+        return base if base.endswith("/v1") else f"{base}/v1"
+
+    def _anthropic_endpoint(self) -> str:
+        base = self._base_url.rstrip("/")
+        return f"{base}/messages" if base.endswith("/v1") else f"{base}/v1/messages"
+
+    def _chat_completions(self, messages: list[dict], max_tokens: int) -> str:
+        client = OpenAI(api_key=self._api_key, base_url=self._sdk_base_url())
+        response = client.chat.completions.create(
+            model=self._model,
+            messages=messages,
+            max_tokens=max_tokens,
+            temperature=0.3,
+        )
+        return response.choices[0].message.content or ""
+
+    def _responses(self, messages: list[dict], max_tokens: int) -> str:
+        client = OpenAI(api_key=self._api_key, base_url=self._sdk_base_url())
+        response = client.responses.create(
+            model=self._model,
+            input=messages,
+            max_output_tokens=max_tokens,
+        )
+        return getattr(response, "output_text", "") or ""
+
+    def _anthropic_messages(
+        self,
+        messages: list[dict],
+        max_tokens: int,
+        system: str | None = None,
+    ) -> str:
+        payload: dict = {
+            "model": self._model,
+            "max_tokens": max_tokens,
+            "messages": messages,
+        }
+        if system:
+            payload["system"] = system
+
+        response = httpx.post(
+            self._anthropic_endpoint(),
+            headers={
+                "x-api-key": self._api_key,
+                "anthropic-version": "2023-06-01",
+            },
+            json=payload,
+            timeout=30.0,
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data.get("content", [])
+        return "".join(
+            part.get("text", "")
+            for part in content
+            if isinstance(part, dict) and part.get("type") == "text"
+        )
+
+    def _request(self, prompt: str, system: str | None, max_tokens: int) -> str:
+        if self._api_format == "anthropic_messages":
+            messages = [{"role": "user", "content": prompt}]
+            return self._anthropic_messages(messages, max_tokens, system=system)
+
+        messages = (
+            [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
+            if system
+            else [{"role": "user", "content": prompt}]
+        )
+        if self._api_format == "responses":
+            return self._responses(messages, max_tokens)
+        return self._chat_completions(messages, max_tokens)
+
+    def test_connection(self) -> bool:
+        try:
+            return bool(self._request("ping", None, 5).strip())
+        except Exception:
+            return False
+
+    def translate(
+        self,
+        text: str,
+        source_lang: str = "auto",
+        target_lang: str = "zh",
+        timeout: float = 15.0,
+        detailed: bool = False,
+    ) -> TranslationResult:
+        start = time.monotonic()
+        target_name = _LANG_NAMES.get(target_lang, target_lang)
+
+        if not detailed:
+            prompt = TRANSLATION_QUICK_PROMPT.format(target_lang=target_name, text=text)
+            raw = self._request(prompt, None, 1024).strip()
+            return TranslationResult(
+                translation=raw,
+                engine=self.name,
+                latency=time.monotonic() - start,
+            )
+
+        prompt = TRANSLATION_PROMPT.format(target_lang=target_name, text=text)
+        raw = self._request(prompt, "You are a translator. Output only JSON.", 2048)
+        parsed = _parse_structured(raw)
+        if parsed and "translation" in parsed:
+            return TranslationResult(
+                translation=parsed.get("translation", raw),
+                terms=parsed.get("terms", []),
+                sentence_pairs=parsed.get("sentence_pairs", []),
+                word_map=parsed.get("word_map", []),
+                engine=self.name,
+                latency=time.monotonic() - start,
+                structured=True,
+            )
+        return TranslationResult(
+            translation=raw.strip(),
+            engine=self.name,
+            latency=time.monotonic() - start,
+        )
