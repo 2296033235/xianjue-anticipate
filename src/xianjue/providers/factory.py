@@ -12,6 +12,13 @@ def create_provider(config_get) -> LLMProvider:
     """
     provider_type = config_get("model.provider", "cloud")
 
+    if provider_type == "custom":
+        from .openai_compatible_provider import OpenAICompatibleProvider
+        api_key = config_get("model.cloud.api_key", "")
+        model = config_get("model.cloud.model", "deepseek-chat")
+        base_url = config_get("model.cloud.base_url", "https://api.deepseek.com")
+        return OpenAICompatibleProvider(api_key=api_key, model=model, base_url=base_url)
+
     if provider_type == "cloud":
         from .deepseek_provider import DeepSeekProvider
         api_key = config_get("model.cloud.api_key", "")
@@ -23,4 +30,3 @@ def create_provider(config_get) -> LLMProvider:
     host = config_get("model.local.host", "http://localhost:11434")
     model = config_get("model.local.model", "qwen3.5:9b")
     return OllamaProvider(host=host, model=model)
-

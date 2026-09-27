@@ -4,16 +4,16 @@ from __future__ import annotations
 
 from typing import Callable
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QFont, QIcon
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QStackedWidget,
-    QPushButton, QLabel, QComboBox, QSlider, QLineEdit, QCheckBox,
+    QPushButton, QLabel, QComboBox, QSlider, QLineEdit, QCheckBox, QFrame,
     QSpinBox, QGroupBox, QFormLayout, QScrollArea, QTableWidget,
     QTableWidgetItem, QTextEdit, QTabWidget, QHeaderView, QMessageBox,
 )
 
 from .i18n import tr as _tr
+from .nav_button import NAV_ICONS, NavButton
 
 
 _STYLE = """
@@ -22,33 +22,70 @@ QMainWindow {
 }
 QWidget#sidebar {
     background-color: #18181D;
-    min-width: 180px;
-    max-width: 180px;
+    min-width: 96px;
+    max-width: 96px;
 }
-QPushButton#navBtn {
-    text-align: left;
-    padding: 10px 16px;
+QToolButton#navBtn {
+    text-align: center;
+    padding: 10px 12px;
     color: #A0A0B0;
     border: none;
     background: transparent;
-    font-size: 14px;
-    border-radius: 6px;
+    font-size: 12px;
+    border-radius: 12px;
 }
-QPushButton#navBtn:hover {
-    background-color: rgba(255, 255, 255, 10);
+QToolButton#navBtn:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #E6EDF3;
 }
-QPushButton#navBtnActive {
-    text-align: left;
-    padding: 10px 16px;
-    border: none;
-    background-color: rgba(70, 130, 220, 40);
+QToolButton#navBtn:pressed {
+    background-color: rgba(255, 255, 255, 0.08);
+}
+QToolButton#navBtn:checked {
+    background-color: rgba(70, 130, 220, 0.18);
     color: #70B0FF;
-    font-size: 14px;
     font-weight: bold;
-    border-radius: 6px;
+}
+QFrame#secondaryNav {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+QPushButton#secondaryNavBtn {
+    text-align: left;
+    padding: 8px 10px;
+    color: #A0A0B0;
+    border: none;
+    background-color: transparent;
+    border-radius: 8px;
+}
+QPushButton#secondaryNavBtn:hover {
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #E6EDF3;
+}
+QPushButton#secondaryNavBtn:checked {
+    background-color: #4768B0;
+    color: white;
+    font-weight: bold;
 }
 QWidget#contentArea {
     background-color: #1E1E24;
+}
+QFrame#card {
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+}
+QLabel#cardTitle {
+    color: #C0C0C8;
+    font-size: 15px;
+    font-weight: bold;
+}
+QLabel#statusChip {
+    background-color: rgba(80, 170, 120, 0.25);
+    color: #5FD59F;
+    border-radius: 10px;
+    padding: 4px 10px;
 }
 QLabel#pageTitle {
     color: #E0E0E5;
@@ -65,15 +102,17 @@ QLabel#infoText {
     font-size: 13px;
 }
 QGroupBox {
-    border: 1px solid rgba(80, 80, 100, 60);
-    border-radius: 8px;
-    margin-top: 12px;
-    padding-top: 16px;
+    background-color: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    margin-top: 0;
+    padding: 20px 16px 16px 16px;
     color: #B0B0B8;
 }
 QGroupBox::title {
-    subcontrol-origin: margin;
-    left: 12px;
+    subcontrol-position: top left;
+    left: 16px;
+    top: 6px;
     padding: 0 4px;
 }
 QLineEdit, QComboBox, QTextEdit {
@@ -113,12 +152,20 @@ QHeaderView::section {
 
 
 _NAV_ITEMS = [
-    ("dashboard", "Dashboard"),
-    ("translate", "Translate"),
-    ("vocabulary", "Vocabulary"),
-    ("review", "Review"),
-    ("history", "History"),
-    ("settings", "Settings"),
+    ("dashboard", "Dashboard", NAV_ICONS["home"]),
+    ("translate", "Translate", NAV_ICONS["translate"]),
+    ("review", "Review", NAV_ICONS["vocab"]),
+    ("history", "History", NAV_ICONS["history"]),
+    ("settings", "Settings", NAV_ICONS["settings"]),
+]
+
+_PAGE_KEYS = [
+    "dashboard",
+    "translate",
+    "vocabulary",
+    "review",
+    "history",
+    "settings",
 ]
 
 
@@ -134,7 +181,7 @@ class MainWindow(QMainWindow):
         refresh_provider: Callable,
     ) -> None:
         super().__init__()
-        self.setWindowTitle("XianJue (先觉)")
+        self.setWindowTitle("XianJue")
         self.setMinimumSize(900, 640)
         self.setStyleSheet(_STYLE)
 
@@ -158,18 +205,29 @@ class MainWindow(QMainWindow):
         sidebar.setObjectName("sidebar")
         sidebar_layout = QVBoxLayout(sidebar)
         sidebar_layout.setContentsMargins(8, 16, 8, 16)
-        sidebar_layout.setSpacing(2)
+        sidebar_layout.setSpacing(6)
 
         # Logo/title.
-        title = QLabel("XianJue (先觉)")
-        title.setStyleSheet("color: #70B0FF; font-size: 16px; font-weight: bold; padding: 0 8px 12px 8px;")
+        title = QLabel("XianJue")
+        title.setStyleSheet("""
+            QLabel {
+                color: #E6EDF3;
+                font-family: "Segoe Script", cursive;
+                font-size: 14px;
+                font-weight: bold;
+                letter-spacing: 0;
+                padding: 0 4px 12px 4px;
+            }
+        """)
         sidebar_layout.addWidget(title)
+        sidebar_layout.addSpacing(8)
 
         self._nav_buttons = {}
         self._stack = QStackedWidget()
+        self._current_page = "dashboard"
 
-        for key, label in _NAV_ITEMS:
-            btn = QPushButton(self._tr(label))
+        for key, label, icon in _NAV_ITEMS:
+            btn = NavButton(key, self._tr(label), icon)
             btn.setObjectName("navBtn")
             btn.clicked.connect(lambda checked, k=key: self._navigate(k))
             sidebar_layout.addWidget(btn)
@@ -206,12 +264,10 @@ class MainWindow(QMainWindow):
 
     def _navigate(self, key: str) -> None:
         self._current_page = key
-        index = [k for k, _ in _NAV_ITEMS].index(key)
+        index = _PAGE_KEYS.index(key)
         self._stack.setCurrentIndex(index)
         for k, btn in self._nav_buttons.items():
-            btn.setObjectName("navBtnActive" if k == key else "navBtn")
-            btn.style().unpolish(btn)
-            btn.style().polish(btn)
+            btn.setChecked(k == key)
 
     # --- pages ------------------------------------------------------------------
 
@@ -223,7 +279,7 @@ class MainWindow(QMainWindow):
         scroll.setWidget(page)
         scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(16)
 
         title_label = QLabel(title)
@@ -232,13 +288,33 @@ class MainWindow(QMainWindow):
 
         return scroll, layout
 
+    def _make_card(
+        self,
+        parent_layout: QVBoxLayout,
+        title: str | None = None,
+    ) -> tuple[QFrame, QVBoxLayout]:
+        """Create a rounded content card and add it to the page layout."""
+        card = QFrame()
+        card.setObjectName("card")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(16, 16, 16, 16)
+        card_layout.setSpacing(12)
+        if title:
+            title_label = QLabel(title)
+            title_label.setObjectName("cardTitle")
+            card_layout.addWidget(title_label)
+        parent_layout.addWidget(card)
+        return card, card_layout
+
     # --- dashboard -------------------------------------------------------------
 
     def _build_dashboard_page(self) -> QWidget:
         scroll, layout = self._make_page(self._tr("Dashboard"))
 
-        stats = QGroupBox("Today")
-        stats_layout = QHBoxLayout(stats)
+        stats, stats_card_layout = self._make_card(layout, self._tr("Today"))
+        stats_layout = QHBoxLayout()
+        stats_layout.setSpacing(16)
+        stats_card_layout.addLayout(stats_layout)
 
         self._stat_translations = QLabel(f"0\n{self._tr('Translations')}")
         self._stat_translations.setObjectName("sectionTitle")
@@ -255,13 +331,8 @@ class MainWindow(QMainWindow):
         self._stat_streak.setAlignment(Qt.AlignmentFlag.AlignCenter)
         stats_layout.addWidget(self._stat_streak)
 
-        layout.addWidget(stats)
-
         # Recent translations.
-        recent_title = QLabel(self._tr("Recent Translations"))
-        recent_title.setObjectName("sectionTitle")
-        layout.addWidget(recent_title)
-
+        _, recent_layout = self._make_card(layout, self._tr("Recent Translations"))
         self._recent_table = QTableWidget()
         self._recent_table.setColumnCount(3)
         self._recent_table.setHorizontalHeaderLabels([self._tr("Source"), self._tr("Result"), self._tr("Engine")])
@@ -270,7 +341,7 @@ class MainWindow(QMainWindow):
         self._recent_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         self._recent_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._recent_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        layout.addWidget(self._recent_table)
+        recent_layout.addWidget(self._recent_table)
 
         layout.addStretch()
         return scroll
@@ -293,14 +364,12 @@ class MainWindow(QMainWindow):
         scroll, layout = self._make_page(self._tr("Translate"))
 
         # Source text.
-        src_label = QLabel(self._tr("Source Text"))
-        src_label.setObjectName("sectionTitle")
-        layout.addWidget(src_label)
+        _, source_layout = self._make_card(layout, self._tr("Source Text"))
 
         self._translate_input = QTextEdit()
         self._translate_input.setPlaceholderText(self._tr("Source Text") + "...")
         self._translate_input.setMinimumHeight(120)
-        layout.addWidget(self._translate_input)
+        source_layout.addWidget(self._translate_input)
 
         # Language selection.
         lang_layout = QHBoxLayout()
@@ -318,17 +387,15 @@ class MainWindow(QMainWindow):
         self._translate_btn.setObjectName("primaryBtn")
         self._translate_btn.clicked.connect(self._do_manual_translate)
         lang_layout.addWidget(self._translate_btn)
-        layout.addLayout(lang_layout)
+        source_layout.addLayout(lang_layout)
 
         # Result.
-        result_label = QLabel(self._tr("Result"))
-        result_label.setObjectName("sectionTitle")
-        layout.addWidget(result_label)
+        _, result_layout = self._make_card(layout, self._tr("Result"))
 
         self._translate_result = QTextEdit()
         self._translate_result.setReadOnly(True)
         self._translate_result.setMinimumHeight(150)
-        layout.addWidget(self._translate_result)
+        result_layout.addWidget(self._translate_result)
 
         layout.addStretch()
         return scroll
@@ -374,6 +441,8 @@ class MainWindow(QMainWindow):
         actions_layout.addWidget(delete_btn)
         actions_layout.addStretch()
 
+        _, vocab_layout = self._make_card(layout)
+
         self._vocab_table = QTableWidget()
         self._vocab_table.setColumnCount(5)
         self._vocab_table.setHorizontalHeaderLabels([
@@ -388,9 +457,8 @@ class MainWindow(QMainWindow):
         self._vocab_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._vocab_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._vocab_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
-        layout.addWidget(self._vocab_table)
-
-        layout.addLayout(actions_layout)
+        vocab_layout.addWidget(self._vocab_table)
+        vocab_layout.addLayout(actions_layout)
 
         return scroll
 
@@ -514,6 +582,8 @@ class MainWindow(QMainWindow):
     def _build_history_page(self) -> QWidget:
         scroll, layout = self._make_page(self._tr("History"))
 
+        _, history_layout = self._make_card(layout)
+
         self._history_table = QTableWidget()
         self._history_table.setColumnCount(4)
         self._history_table.setHorizontalHeaderLabels([self._tr("Time"), self._tr("Source"), self._tr("Result"), self._tr("Engine")])
@@ -522,12 +592,12 @@ class MainWindow(QMainWindow):
         self._history_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         self._history_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         self._history_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        layout.addWidget(self._history_table)
+        history_layout.addWidget(self._history_table)
 
         refresh_btn = QPushButton(self._tr("Refresh"))
         refresh_btn.setObjectName("primaryBtn")
         refresh_btn.clicked.connect(self.refresh_history)
-        layout.addWidget(refresh_btn)
+        history_layout.addWidget(refresh_btn)
 
         return scroll
 
@@ -545,7 +615,51 @@ class MainWindow(QMainWindow):
     # --- settings -------------------------------------------------------------------
 
     def _build_settings_page(self) -> QWidget:
-        scroll, layout = self._make_page(self._tr("Settings"))
+        shell = QWidget()
+        shell_layout = QHBoxLayout(shell)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(16)
+
+        nav = QFrame()
+        nav.setObjectName("secondaryNav")
+        nav.setFixedWidth(120)
+        nav_layout = QVBoxLayout(nav)
+        nav_layout.setContentsMargins(8, 8, 8, 8)
+        nav_layout.setSpacing(8)
+
+        self._settings_stack = QStackedWidget()
+        self._settings_stack.addWidget(self._build_general_settings_page())
+        self._settings_stack.addWidget(self._build_model_settings_page())
+        self._settings_stack.addWidget(self._build_app_settings_page())
+
+        self._settings_section_buttons = {}
+        for key, label in [
+            ("general", self._tr("General")),
+            ("model", self._tr("Model Config")),
+            ("about", self._tr("App Related")),
+        ]:
+            btn = QPushButton(label)
+            btn.setObjectName("secondaryNavBtn")
+            btn.setCheckable(True)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.clicked.connect(lambda checked=False, k=key: self._set_settings_section(k))
+            nav_layout.addWidget(btn)
+            self._settings_section_buttons[key] = btn
+        nav_layout.addStretch()
+
+        shell_layout.addWidget(nav)
+        shell_layout.addWidget(self._settings_stack, 1)
+        self._set_settings_section("general")
+        return shell
+
+    def _set_settings_section(self, key: str) -> None:
+        index = ["general", "model", "about"].index(key)
+        self._settings_stack.setCurrentIndex(index)
+        for section, btn in self._settings_section_buttons.items():
+            btn.setChecked(section == key)
+
+    def _build_general_settings_page(self) -> QWidget:
+        scroll, layout = self._make_page(self._tr("General"))
 
         # Trigger length group.
         trigger_group = QGroupBox(self._tr("Trigger Settings"))
@@ -574,30 +688,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(trigger_group)
 
-        # Engine group.
-        engine_group = QGroupBox(self._tr("Translation Engine"))
-        engine_layout = QVBoxLayout(engine_group)
-
-        self._engine_combo = QComboBox()
-        self._engine_combo.addItems([self._tr("Cloud (DeepSeek)"), self._tr("Local (Ollama)")])
-        self._engine_combo.setCurrentIndex(0 if self._config_get("model.provider", "cloud") == "cloud" else 1)
-        self._engine_combo.currentIndexChanged.connect(self._on_engine_changed)
-        engine_layout.addWidget(self._engine_combo)
-
-        self._key_row_widget = QWidget()
-        key_row = QHBoxLayout(self._key_row_widget)
-        key_row.setContentsMargins(0, 0, 0, 0)
-        key_row.addWidget(QLabel(self._tr("API Key:")))
-        self._api_key_input = QLineEdit(self._config_get("model.cloud.api_key", ""))
-        self._api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
-        key_row.addWidget(self._api_key_input)
-        test_btn = QPushButton(self._tr("Test"))
-        test_btn.clicked.connect(self._test_connection)
-        key_row.addWidget(test_btn)
-        engine_layout.addWidget(self._key_row_widget)
-
-        layout.addWidget(engine_group)
-        self._key_row_widget.setVisible(self._config_get("model.provider", "cloud") == "cloud")
+        layout.addWidget(trigger_group)
 
         # Floating window group.
         float_group = QGroupBox(self._tr("Floating Window"))
@@ -640,6 +731,367 @@ class MainWindow(QMainWindow):
         layout.addStretch()
         return scroll
 
+    def _build_model_settings_page(self) -> QWidget:
+        scroll, layout = self._make_page(self._tr("Model Config"))
+
+        current_card, current_layout = self._make_card(layout, self._tr("Current Model"))
+        self._model_type_combo = QComboBox()
+        self._model_type_combo.addItems([
+            self._tr("Custom (Cloud Model)"),
+            self._tr("Ollama (Local Model)"),
+        ])
+        self._model_type_combo.setCurrentIndex(
+            0 if self._config_get("model.provider", "cloud") != "local" else 1
+        )
+        current_layout.addWidget(self._model_type_combo)
+
+        current_row = QHBoxLayout()
+        self._current_model_label = QLabel(self._provider_display_text())
+        current_row.addWidget(self._current_model_label)
+        current_row.addStretch()
+        self._model_status_label = QLabel(self._tr("Not tested"))
+        self._model_status_label.setObjectName("statusChip")
+        current_row.addWidget(self._model_status_label)
+        current_layout.addLayout(current_row)
+
+        # --- custom cloud model ---------------------------------------------
+        self._cloud_card, cloud_layout = self._make_card(
+            layout, self._tr("Custom (Cloud Model)")
+        )
+        cloud_form = QFormLayout()
+        cloud_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+
+        self._api_format_combo = QComboBox()
+        self._api_format_combo.addItems([
+            self._tr("OpenAI compatible"),
+            self._tr("DeepSeek API"),
+        ])
+        cloud_form.addRow(self._tr("API Format"), self._api_format_combo)
+
+        self._api_base_input = QLineEdit()
+        self._api_base_input.setPlaceholderText("https://api.openai.com/v1")
+        cloud_form.addRow(self._tr("API Address"), self._api_base_input)
+
+        self._api_key_input = QLineEdit()
+        self._api_key_input.setEchoMode(QLineEdit.EchoMode.Password)
+        cloud_form.addRow(self._tr("API Key:"), self._api_key_input)
+
+        self._cloud_model_input = QLineEdit()
+        self._cloud_model_input.setPlaceholderText("gpt-4o-mini")
+        cloud_form.addRow(self._tr("Model Name"), self._cloud_model_input)
+
+        self._config_name_input = QLineEdit()
+        self._config_name_input.setPlaceholderText("My model")
+        cloud_form.addRow(self._tr("Config Name"), self._config_name_input)
+        cloud_layout.addLayout(cloud_form)
+
+        cloud_buttons = QHBoxLayout()
+        save_btn = QPushButton(self._tr("Save Config"))
+        save_btn.setObjectName("primaryBtn")
+        save_btn.clicked.connect(self._save_cloud_config)
+        test_btn = QPushButton(self._tr("Test"))
+        test_btn.clicked.connect(self._test_cloud_connection)
+        cloud_buttons.addWidget(save_btn)
+        cloud_buttons.addWidget(test_btn)
+        cloud_buttons.addStretch()
+        cloud_layout.addLayout(cloud_buttons)
+
+        self._cloud_configs_card, cloud_configs_layout = self._make_card(
+            layout, self._tr("Saved Configs")
+        )
+        self._saved_configs_table = QTableWidget(0, 3)
+        self._saved_configs_table.setHorizontalHeaderLabels([
+            self._tr("Config"), self._tr("API Format"),
+            self._tr("Model Name"),
+        ])
+        self._saved_configs_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._saved_configs_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+        self._saved_configs_table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        self._saved_configs_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._saved_configs_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._saved_configs_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._saved_configs_table.itemSelectionChanged.connect(self._on_saved_config_selected)
+        cloud_configs_layout.addWidget(self._saved_configs_table)
+
+        config_buttons = QHBoxLayout()
+        delete_btn = QPushButton(self._tr("Delete"))
+        delete_btn.clicked.connect(self._delete_selected_cloud_config)
+        config_buttons.addWidget(delete_btn)
+        config_buttons.addStretch()
+        cloud_configs_layout.addLayout(config_buttons)
+
+        # --- local Ollama ---------------------------------------------------
+        self._ollama_card, ollama_layout = self._make_card(
+            layout, self._tr("Ollama (Local Model)")
+        )
+        intro_label = QLabel(self._tr("Ollama is a local model runtime."))
+        intro_label.setWordWrap(True)
+        ollama_layout.addWidget(intro_label)
+
+        download_link = QLabel(
+            f'<a href="https://ollama.com/download">{self._tr("Download Ollama")}</a>'
+        )
+        download_link.setOpenExternalLinks(True)
+        ollama_layout.addWidget(download_link)
+
+        self._ollama_models_card, models_layout = self._make_card(
+            layout, self._tr("Detected Models")
+        )
+        models_header = QHBoxLayout()
+        models_header.addWidget(QLabel(self._tr("Select a model to use")))
+        models_header.addStretch()
+        refresh_btn = QPushButton(self._tr("Refresh"))
+        refresh_btn.clicked.connect(self._detect_ollama_models)
+        models_header.addWidget(refresh_btn)
+        models_layout.addLayout(models_header)
+
+        self._ollama_models_table = QTableWidget(0, 1)
+        self._ollama_models_table.setHorizontalHeaderLabels([self._tr("Model Name")])
+        self._ollama_models_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self._ollama_models_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._ollama_models_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._ollama_models_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._ollama_models_table.itemSelectionChanged.connect(self._on_ollama_model_selected)
+        models_layout.addWidget(self._ollama_models_table)
+
+        self._model_type_combo.currentIndexChanged.connect(self._on_model_type_changed)
+        self._on_model_type_changed(self._model_type_combo.currentIndex())
+        self._refresh_cloud_configs()
+
+        layout.addStretch()
+        return scroll
+
+    def _build_app_settings_page(self) -> QWidget:
+        scroll, layout = self._make_page(self._tr("App Related"))
+
+        _, about_layout = self._make_card(layout, self._tr("About"))
+        about_label = QLabel(
+            self._tr("XianJue is a translation and vocabulary learning tool built around a quick floating window and a focused main window.")
+        )
+        about_label.setWordWrap(True)
+        about_layout.addWidget(about_label)
+
+        layout.addStretch()
+        return scroll
+
+    def _provider_display_text(self) -> str:
+        provider = self._config_get("model.provider", "cloud")
+        if provider == "local":
+            model = self._config_get("model.local.model", "")
+            if model:
+                return f"Ollama ({model})"
+            return self._tr("Ollama not configured")
+
+        configs = self._config_get("model.saved_cloud_configs", [])
+        active = self._config_get("model.active_config", 0)
+        if isinstance(active, int) and 0 <= active < len(configs):
+            config = configs[active]
+            name = config.get("name", "Custom")
+            model = config.get("model", "")
+            return f"{name} ({model})"
+        return self._tr("No model configured")
+
+    def _update_current_model_label(self) -> None:
+        if hasattr(self, "_current_model_label"):
+            self._current_model_label.setText(self._provider_display_text())
+
+    def _on_model_type_changed(self, index: int) -> None:
+        provider = "custom" if index == 0 else "local"
+        self._config_set("model.provider", provider)
+        self._update_cloud_fields_visibility()
+        self._update_ollama_fields_visibility()
+        self._update_current_model_label()
+        self._refresh_provider()
+
+    def _update_cloud_fields_visibility(self) -> None:
+        is_custom = self._model_type_combo.currentIndex() == 0
+        self._cloud_card.setVisible(is_custom)
+        self._cloud_configs_card.setVisible(is_custom)
+
+    def _update_ollama_fields_visibility(self) -> None:
+        is_local = self._model_type_combo.currentIndex() == 1
+        self._ollama_card.setVisible(is_local)
+        self._ollama_models_card.setVisible(is_local)
+
+    def _cloud_config_from_form(self) -> dict:
+        return {
+            "name": self._config_name_input.text().strip(),
+            "api_format": "deepseek" if self._api_format_combo.currentIndex() == 1 else "openai_compatible",
+            "base_url": self._api_base_input.text().strip(),
+            "api_key": self._api_key_input.text().strip(),
+            "model": self._cloud_model_input.text().strip(),
+        }
+
+    def _load_cloud_config_into_form(self, config: dict) -> None:
+        self._config_name_input.setText(config.get("name", ""))
+        self._api_format_combo.setCurrentIndex(1 if config.get("api_format") == "deepseek" else 0)
+        self._api_base_input.setText(config.get("base_url", ""))
+        self._api_key_input.setText(config.get("api_key", ""))
+        self._cloud_model_input.setText(config.get("model", ""))
+
+    def _refresh_cloud_configs(self) -> None:
+        configs = self._config_get("model.saved_cloud_configs", [])
+        self._saved_configs_table.blockSignals(True)
+        self._saved_configs_table.setRowCount(len(configs))
+        for row, config in enumerate(configs):
+            self._saved_configs_table.setItem(row, 0, QTableWidgetItem(config.get("name", "")))
+            self._saved_configs_table.setItem(
+                row, 1,
+                QTableWidgetItem(self._tr("DeepSeek API") if config.get("api_format") == "deepseek" else self._tr("OpenAI compatible")),
+            )
+            self._saved_configs_table.setItem(row, 2, QTableWidgetItem(config.get("model", "")))
+        self._saved_configs_table.blockSignals(False)
+
+    def _on_saved_config_selected(self) -> None:
+        row = self._saved_configs_table.currentRow()
+        if row < 0:
+            return
+        configs = self._config_get("model.saved_cloud_configs", [])
+        if row >= len(configs):
+            return
+        self._load_cloud_config_into_form(configs[row])
+        self._config_set("model.active_config", row)
+        self._config_set("model.provider", "custom")
+        self._update_current_model_label()
+        self._refresh_provider()
+
+    def _save_cloud_config(self) -> None:
+        config = self._cloud_config_from_form()
+        if not config["name"]:
+            QMessageBox.information(self, self._tr("Save Config"), self._tr("Please enter a config name"))
+            return
+        if not config["model"]:
+            QMessageBox.information(self, self._tr("Save Config"), self._tr("Please enter a model name"))
+            return
+
+        configs = self._config_get("model.saved_cloud_configs", [])
+        configs.append(config)
+        active = len(configs) - 1
+
+        self._config_set("model.saved_cloud_configs", configs)
+        self._config_set("model.active_config", active)
+        self._config_set("model.provider", "custom")
+        self._refresh_cloud_configs()
+        self._update_current_model_label()
+        self._refresh_provider()
+
+    def _delete_cloud_config(self, row: int) -> None:
+        configs = self._config_get("model.saved_cloud_configs", [])
+        if row < 0 or row >= len(configs):
+            return
+        configs.pop(row)
+        self._config_set("model.saved_cloud_configs", configs)
+        active = self._config_get("model.active_config", 0)
+        if isinstance(active, int) and active >= len(configs):
+            self._config_set("model.active_config", None if not configs else len(configs) - 1)
+        self._refresh_cloud_configs()
+        self._update_current_model_label()
+        self._refresh_provider()
+
+    def _delete_selected_cloud_config(self) -> None:
+        row = self._saved_configs_table.currentRow()
+        self._delete_cloud_config(row)
+
+    def _test_cloud_connection(self) -> None:
+        self._test_cloud_config(self._cloud_config_from_form())
+
+    def _test_cloud_config(self, config: dict) -> None:
+        import threading
+        import time as _time
+        from ..providers.deepseek_provider import DeepSeekProvider
+        from ..providers.openai_compatible_provider import OpenAICompatibleProvider
+
+        def worker():
+            start = _time.monotonic()
+            ok = False
+            error = ""
+            try:
+                if config.get("api_format") == "deepseek":
+                    provider = DeepSeekProvider(
+                        api_key=config.get("api_key", ""),
+                        model=config.get("model", ""),
+                    )
+                else:
+                    provider = OpenAICompatibleProvider(
+                        api_key=config.get("api_key", ""),
+                        model=config.get("model", ""),
+                        base_url=config.get("base_url", ""),
+                    )
+                ok = provider.test_connection()
+            except Exception as exc:
+                error = str(exc)
+
+            latency = int((_time.monotonic() - start) * 1000)
+            message = (
+                f"{self._tr('Connected')} · {latency} ms"
+                if ok
+                else f"{self._tr('Connection failed')}: {error or self._tr('Unknown error')}"
+            )
+            QTimer.singleShot(0, lambda: self._set_model_status(ok, message))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _set_model_status(self, ok: bool, message: str) -> None:
+        self._model_status_label.setText(message)
+        if ok:
+            self._model_status_label.setStyleSheet(
+                "QLabel#statusChip { background-color: rgba(80, 170, 120, 0.25); color: #5FD59F; border-radius: 10px; padding: 4px 10px; }"
+            )
+        else:
+            self._model_status_label.setStyleSheet(
+                "QLabel#statusChip { background-color: rgba(230, 100, 100, 0.2); color: #FF9A9A; border-radius: 10px; padding: 4px 10px; }"
+            )
+
+    def _detect_ollama_models(self) -> None:
+        import threading
+        from ..providers.ollama_provider import OllamaProvider
+
+        host = self._config_get("model.local.host", "http://localhost:11434")
+        self._set_ollama_models_status(self._tr("Detecting..."))
+
+        def worker():
+            provider = OllamaProvider(host=host, model="")
+            models = provider.list_models()
+            QTimer.singleShot(0, lambda: self._refresh_ollama_models(models))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _refresh_ollama_models(self, models: list[str]) -> None:
+        self._ollama_models_table.blockSignals(True)
+        self._ollama_models_table.setRowCount(len(models))
+        for row, model in enumerate(models):
+            self._ollama_models_table.setItem(row, 0, QTableWidgetItem(model))
+        self._ollama_models_table.blockSignals(False)
+
+        if models:
+            self._set_ollama_models_status("")
+        else:
+            self._set_ollama_models_status(self._tr("No Ollama models found"))
+
+    def _set_ollama_models_status(self, message: str) -> None:
+        if message:
+            self._ollama_models_table.setRowCount(0)
+            self._ollama_models_table.setRowCount(1)
+            self._ollama_models_table.setItem(0, 0, QTableWidgetItem(message))
+            self._ollama_models_table.item(0, 0).setFlags(Qt.ItemFlag.ItemIsEnabled)
+        else:
+            self._ollama_models_table.setRowCount(0)
+
+    def _on_ollama_model_selected(self) -> None:
+        row = self._ollama_models_table.currentRow()
+        if row < 0:
+            return
+        model_item = self._ollama_models_table.item(row, 0)
+        if not model_item:
+            return
+        model = model_item.text().strip()
+        if not model:
+            return
+        self._config_set("model.provider", "local")
+        self._config_set("model.local.model", model)
+        self._update_current_model_label()
+        self._refresh_provider()
+
     # --- settings callbacks --------------------------------------------------------
 
     def _on_preset_changed(self, index: int) -> None:
@@ -663,7 +1115,7 @@ class MainWindow(QMainWindow):
         current_page = self._current_page
 
         # Rebuild nav buttons.
-        for key, label in _NAV_ITEMS:
+        for key, label, _ in _NAV_ITEMS:
             btn = self._nav_buttons[key]
             btn.setText(self._tr(label))
 
@@ -680,6 +1132,8 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._build_review_page())
         self._stack.addWidget(self._build_history_page())
         self._stack.addWidget(self._build_settings_page())
+        if current_page == "vocabulary":
+            current_page = "review"
         self._navigate(current_page if current_page else "dashboard")
 
     def _on_length_input_changed(self) -> None:
@@ -687,36 +1141,10 @@ class MainWindow(QMainWindow):
         try:
             value = int(text)
             value = max(10, min(500, value))
-            self._slider.setValue(value)
+            self._trigger_slider.setValue(value)
             self._config_set("trigger_length", value)
         except ValueError:
             pass
-
-    def _on_engine_changed(self, index: int) -> None:
-        provider = "cloud" if index == 0 else "local"
-        self._config_set("model.provider", provider)
-        # Show/hide API key row based on engine selection.
-        self._key_row_widget.setVisible(provider == "cloud")
-        self._refresh_provider()
-
-    def _test_connection(self) -> None:
-        self._config_set("model.cloud.api_key", self._api_key_input.text().strip())
-        import threading
-        from ..providers.factory import create_provider
-
-        def test():
-            try:
-                provider = create_provider(self._config_get)
-                ok = provider.test_connection()
-                msg = "OK" if ok else "Connection failed"
-            except Exception as e:
-                msg = str(e)
-            from PySide6.QtCore import QTimer
-            QTimer.singleShot(0, lambda: QMessageBox.information(
-                self, self._tr("Test"), msg
-            ))
-
-        threading.Thread(target=test, daemon=True).start()
 
     # --- utils -------------------------------------------------------------------
 
