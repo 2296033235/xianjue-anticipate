@@ -9,6 +9,7 @@ from PySide6.QtWidgets import QSlider
 from src.xianjue.core.config import Config
 from src.xianjue.providers.custom_cloud_provider import CustomCloudProvider
 from src.xianjue.providers.factory import create_provider
+from src.xianjue.ui.toggle_switch import ToggleSwitch
 from src.xianjue.ui.main_window import MainWindow
 
 
@@ -87,6 +88,7 @@ def test_saved_config_rows_render_action_controls(window):
     assert len(window._saved_config_rows) == 1
     row = window._saved_config_rows[0]
     assert row["row"].property("active") is True
+    assert isinstance(row["toggle"], ToggleSwitch)
     assert row["toggle"].value() == 1
     assert row["test"].text() == "测试"
     assert row["delete"].text() == ""

@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from .i18n import tr as _tr
 from .nav_button import NAV_ICONS, NavButton, make_icon
+from .toggle_switch import ToggleSwitch
 
 
 _STYLE = """
@@ -109,30 +110,6 @@ QLabel#modelConfigTitle {
 QLabel#modelConfigSubtitle {
     color: #8A8A98;
     font-size: 12px;
-}
-QSlider#modelToggle {
-    min-height: 22px;
-    max-height: 22px;
-    background-color: transparent;
-}
-QSlider#modelToggle::groove:horizontal {
-    height: 22px;
-    border-radius: 11px;
-    background-color: #C9CDD6;
-}
-QSlider#modelToggle::sub-page:horizontal {
-    background-color: #C9CDD6;
-    border-radius: 11px;
-}
-QSlider#modelToggle::add-page:horizontal {
-    background-color: #C9CDD6;
-    border-radius: 11px;
-}
-QSlider#modelToggle::handle:horizontal {
-    width: 18px;
-    margin: 2px;
-    border-radius: 9px;
-    background-color: white;
 }
 QPushButton#modelActionBtn {
     background-color: rgba(95, 213, 159, 0.18);
@@ -1031,7 +1008,7 @@ class MainWindow(QMainWindow):
         config: dict,
         row: int,
         is_active: bool,
-    ) -> tuple[QFrame, QSlider, QPushButton, QPushButton]:
+    ) -> tuple[QFrame, ToggleSwitch, QPushButton, QPushButton]:
         row_widget = QFrame()
         row_widget.setObjectName("modelConfigRow")
         row_widget.setProperty("active", is_active)
@@ -1061,11 +1038,8 @@ class MainWindow(QMainWindow):
         text_layout.addWidget(subtitle)
         row_layout.addLayout(text_layout, 1)
 
-        toggle = QSlider(Qt.Orientation.Horizontal)
+        toggle = ToggleSwitch()
         toggle.setObjectName("modelToggle")
-        toggle.setRange(0, 1)
-        toggle.setPageStep(1)
-        toggle.setFixedSize(42, 22)
         toggle.setValue(1 if is_active else 0)
         toggle.valueChanged.connect(lambda value, index=row: self._set_active_cloud_config(index, bool(value)))
         row_layout.addWidget(toggle)
