@@ -890,6 +890,8 @@ class MainWindow(QMainWindow):
         self._ollama_models_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._ollama_models_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self._ollama_models_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._ollama_models_table.verticalHeader().setDefaultSectionSize(48)
+        self._ollama_models_table.setColumnWidth(1, 72)
         self._ollama_models_table.itemSelectionChanged.connect(self._on_ollama_model_selected)
         models_layout.addWidget(self._ollama_models_table)
 
@@ -1235,7 +1237,14 @@ class MainWindow(QMainWindow):
             toggle.valueChanged.connect(
                 lambda value, model=model, row=row: self._on_ollama_model_toggled(model, row, bool(value))
             )
-            self._ollama_models_table.setCellWidget(row, 1, toggle)
+            cell_widget = QWidget()
+            cell_layout = QHBoxLayout(cell_widget)
+            cell_layout.setContentsMargins(14, 14, 14, 14)
+            cell_layout.setSpacing(0)
+            cell_layout.addWidget(toggle)
+            cell_layout.addStretch()
+            self._ollama_models_table.setCellWidget(row, 1, cell_widget)
+            self._ollama_models_table.setRowHeight(row, 48)
 
         self._ollama_models_table.blockSignals(False)
 

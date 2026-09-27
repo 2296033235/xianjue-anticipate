@@ -42,6 +42,13 @@ class ToggleSwitch(QSlider):
             self._position = float(target)
         super().setValue(target)
 
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setValue(1 if self.value() == 0 else 0)
+            event.accept()
+            return
+        super().mousePressEvent(event)
+
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
