@@ -1068,6 +1068,14 @@ class MainWindow(QMainWindow):
         if 0 <= row < len(configs):
             self._load_cloud_config_into_form(configs[row])
 
+    def _apply_active_row_state(self) -> None:
+        active = self._config_get("model.active_config", None)
+        for index, row in enumerate(self._saved_config_rows):
+            is_active = active == index
+            row["row"].setProperty("active", is_active)
+            self._polish_widget(row["row"])
+            row["toggle"].setValue(1 if is_active else 0)
+
     def _clear_cloud_form(self) -> None:
         self._api_format_combo.setCurrentIndex(0)
         self._api_base_input.clear()
@@ -1086,7 +1094,7 @@ class MainWindow(QMainWindow):
             self._config_set("model.active_config", None)
 
         self._config_set("model.provider", "custom")
-        self._refresh_cloud_configs()
+        self._apply_active_row_state()
         self._update_current_model_label()
         self._refresh_provider()
 

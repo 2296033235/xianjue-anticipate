@@ -98,6 +98,18 @@ def test_saved_config_rows_render_action_controls(window):
     assert window._saved_config_rows[0]["row"].property("active") is False
 
 
+def test_saved_config_rows_are_not_recreated_on_toggle(window):
+    window._model_type_combo.setCurrentIndex(0)
+    window._cloud_model_input.setText("demo-model")
+    window._save_cloud_config()
+    row = window._saved_config_rows[0]
+    toggle = row["toggle"]
+
+    window._set_active_cloud_config(0, False)
+
+    assert window._saved_config_rows[0]["toggle"] is toggle
+
+
 def test_saved_config_row_tests_saved_values(window, monkeypatch):
     window._model_type_combo.setCurrentIndex(0)
     window._api_key_input.setText("saved-key")
