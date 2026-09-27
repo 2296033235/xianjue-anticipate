@@ -110,6 +110,81 @@ def test_saved_config_rows_are_not_recreated_on_toggle(window):
     assert window._saved_config_rows[0]["toggle"] is toggle
 
 
+def test_model_switching_between_saved_configs(window, monkeypatch):
+    refresh_calls = []
+    monkeypatch.setattr(window, "_refresh_provider", lambda: refresh_calls.append(True))
+
+    window._model_type_combo.setCurrentIndex(0)
+    window._api_format_combo.setCurrentText("Chat Completions (/chat/completions)")
+    window._api_base_input.setText("https://model-a.example.com")
+    window._api_key_input.setText("key-a")
+    window._cloud_model_input.setText("model-a")
+    window._save_cloud_config()
+
+    window._api_format_combo.setCurrentText("Responses (/responses)")
+    window._api_base_input.setText("https://model-b.example.com")
+    window._api_key_input.setText("key-b")
+    window._cloud_model_input.setText("model-b")
+    window._save_cloud_config()
+
+    refresh_calls.clear()
+    window._set_active_cloud_config(1, True)
+
+    assert window._config_get("model.active_config") == 1
+    assert window._provider_display_text() == "model-b (model-b)"
+    assert window._saved_config_rows[0]["row"].property("active") is False
+    assert window._saved_config_rows[0]["toggle"].value() == 0
+    assert window._saved_config_rows[1]["row"].property("active") is True
+    assert window._saved_config_rows[1]["toggle"].value() == 1
+    assert refresh_calls
+
+
+def test_active_config_switch_updates_created_provider(window):
+    window._model_type_combo.setCurrentIndex(0)
+    window._api_format_combo.setCurrentText("Chat Completions (/chat/completions)")
+    window._api_base_input.setText("https://model-a.example.com")
+    window._cloud_model_input.setText("model-a")
+    window._save_cloud_config()
+
+    window._api_format_combo.setCurrentText("Responses (/responses)")
+    window._api_base_input.setText("https://model-b.example.com")
+    window._cloud_model_input.setText("model-b")
+    window._save_cloud_config()
+
+    provider_b = create_provider(window._config_get)
+    assert provider_b._api_format == "responses"
+    assert provider_b._base_url == "https://model-b.example.com"
+
+    window._set_active_cloud_config(0, True)
+
+    provider_a = create_provider(window._config_get)
+    assert provider_a._api_format == "chat_completions"
+    assert provider_a._base_url == "https://model-a.example.com"
+
+
+def test_model_switching_between_cloud_and_ollama(window, monkeypatch):
+    refresh_calls = []
+    monkeypatch.setattr(window, "_refresh_provider", lambda: refresh_calls.append(True))
+
+    window._model_type_combo.setCurrentIndex(0)
+    window._cloud_model_input.setText("cloud-model")
+    window._save_cloud_config()
+    refresh_calls.clear()
+
+    window._model_type_combo.setCurrentIndex(1)
+
+    assert window._config_get("model.provider") == "local"
+    assert window._provider_display_text().startswith("Ollama")
+    assert refresh_calls
+
+    refresh_calls.clear()
+    window._model_type_combo.setCurrentIndex(0)
+
+    assert window._config_get("model.provider") == "custom"
+    assert window._provider_display_text() == "cloud-model (cloud-model)"
+    assert refresh_calls
+
+
 def test_saved_config_row_tests_saved_values(window, monkeypatch):
     window._model_type_combo.setCurrentIndex(0)
     window._api_key_input.setText("saved-key")
