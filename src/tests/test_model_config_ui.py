@@ -125,6 +125,60 @@ def test_saved_config_row_tests_saved_values(window, monkeypatch):
     assert tested[0]["api_key"] == "saved-key"
 
 
+def test_cloud_connection_status_updates_with_detailed_result(window, monkeypatch):
+    from src.xianjue.providers.custom_cloud_provider import CustomCloudProvider
+
+    window._model_type_combo.setCurrentIndex(0)
+    window._cloud_model_input.setText("demo-model")
+    window._save_cloud_config()
+    config = window._config_get("model.saved_cloud_configs")[0]
+
+    monkeypatch.setattr(
+        CustomCloudProvider,
+        "test_connection_detailed",
+        lambda self: (True, "", 42),
+    )
+
+    def run_single_shot(msec, callback):
+        callback()
+
+    monkeypatch.setattr(
+        "src.xianjue.ui.main_window.QTimer.singleShot",
+        run_single_shot,
+    )
+
+    window._test_cloud_config(config)
+
+    assert window._model_status_label.text() == "已连接 · 42 ms"
+
+
+def test_cloud_connection_status_shows_failure_reason(window, monkeypatch):
+    from src.xianjue.providers.custom_cloud_provider import CustomCloudProvider
+
+    window._model_type_combo.setCurrentIndex(0)
+    window._cloud_model_input.setText("demo-model")
+    window._save_cloud_config()
+    config = window._config_get("model.saved_cloud_configs")[0]
+
+    monkeypatch.setattr(
+        CustomCloudProvider,
+        "test_connection_detailed",
+        lambda self: (False, "bad request", 42),
+    )
+
+    def run_single_shot(msec, callback):
+        callback()
+
+    monkeypatch.setattr(
+        "src.xianjue.ui.main_window.QTimer.singleShot",
+        run_single_shot,
+    )
+
+    window._test_cloud_config(config)
+
+    assert window._model_status_label.text() == "连接失败: bad request"
+
+
 def test_cloud_fields_show_and_ollama_fields_hide(window):
     window._model_type_combo.setCurrentIndex(0)
     assert window._cloud_card.isVisibleTo(window._settings_stack)

@@ -43,30 +43,61 @@ class CustomCloudProvider(LLMProvider):
         base = self._base_url.rstrip("/")
         return f"{base}/messages" if base.endswith("/v1") else f"{base}/v1/messages"
 
-    def _chat_completions(self, messages: list[dict], max_tokens: int) -> str:
+    def _chat_completions(
+        self,
+        messages: list[dict],
+        max_tokens: int,
+        timeout: float = 30.0,
+    ) -> str:
         client = OpenAI(api_key=self._api_key, base_url=self._sdk_base_url())
         response = client.chat.completions.create(
             model=self._model,
             messages=messages,
             max_tokens=max_tokens,
             temperature=0.3,
+            timeout=timeout,
         )
         return response.choices[0].message.content or ""
 
-    def _responses(self, messages: list[dict], max_tokens: int) -> str:
+    def _responses(
+        self,
+        messages: list[dict],
+        max_tokens: int,
+        timeout: float = 30.0,
+    ) -> str:
         client = OpenAI(api_key=self._api_key, base_url=self._sdk_base_url())
         response = client.responses.create(
             model=self._model,
             input=messages,
             max_output_tokens=max_tokens,
+            timeout=timeout,
         )
-        return getattr(response, "output_text", "") or ""
+        if getattr(response, "output_text", None):
+            return response.output_text
+
+        parts: list[str] = []
+        for item in getattr(response, "output", []):
+            content = (
+                item.get("content", [])
+                if isinstance(item, dict)
+                else getattr(item, "content", [])
+            )
+            for part in content:
+                text = (
+                    part.get("text", "")
+                    if isinstance(part, dict)
+                    else getattr(part, "text", "")
+                )
+                if text:
+                    parts.append(text)
+        return "".join(parts)
 
     def _anthropic_messages(
         self,
         messages: list[dict],
         max_tokens: int,
         system: str | None = None,
+        timeout: float = 30.0,
     ) -> str:
         payload: dict = {
             "model": self._model,
@@ -83,7 +114,7 @@ class CustomCloudProvider(LLMProvider):
                 "anthropic-version": "2023-06-01",
             },
             json=payload,
-            timeout=30.0,
+            timeout=timeout,
         )
         response.raise_for_status()
         data = response.json()
@@ -94,10 +125,21 @@ class CustomCloudProvider(LLMProvider):
             if isinstance(part, dict) and part.get("type") == "text"
         )
 
-    def _request(self, prompt: str, system: str | None, max_tokens: int) -> str:
+    def _request(
+        self,
+        prompt: str,
+        system: str | None,
+        max_tokens: int,
+        timeout: float = 30.0,
+    ) -> str:
         if self._api_format == "anthropic_messages":
             messages = [{"role": "user", "content": prompt}]
-            return self._anthropic_messages(messages, max_tokens, system=system)
+            return self._anthropic_messages(
+                messages,
+                max_tokens,
+                system=system,
+                timeout=timeout,
+            )
 
         messages = (
             [{"role": "system", "content": system}, {"role": "user", "content": prompt}]
@@ -105,14 +147,22 @@ class CustomCloudProvider(LLMProvider):
             else [{"role": "user", "content": prompt}]
         )
         if self._api_format == "responses":
-            return self._responses(messages, max_tokens)
-        return self._chat_completions(messages, max_tokens)
+            return self._responses(messages, max_tokens, timeout=timeout)
+        return self._chat_completions(messages, max_tokens, timeout=timeout)
 
     def test_connection(self) -> bool:
+        ok, _, _ = self.test_connection_detailed()
+        return ok
+
+    def test_connection_detailed(self) -> tuple[bool, str, float]:
+        start = time.monotonic()
         try:
-            return bool(self._request("ping", None, 5).strip())
-        except Exception:
-            return False
+            raw = self._request("ping", None, 5, timeout=3.0).strip()
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return bool(raw), "" if raw else "Empty response", latency_ms
+        except Exception as exc:
+            latency_ms = int((time.monotonic() - start) * 1000)
+            return False, str(exc), latency_ms
 
     def translate(
         self,
@@ -127,7 +177,7 @@ class CustomCloudProvider(LLMProvider):
 
         if not detailed:
             prompt = TRANSLATION_QUICK_PROMPT.format(target_lang=target_name, text=text)
-            raw = self._request(prompt, None, 1024).strip()
+            raw = self._request(prompt, None, 1024, timeout=timeout).strip()
             return TranslationResult(
                 translation=raw,
                 engine=self.name,
@@ -135,7 +185,12 @@ class CustomCloudProvider(LLMProvider):
             )
 
         prompt = TRANSLATION_PROMPT.format(target_lang=target_name, text=text)
-        raw = self._request(prompt, "You are a translator. Output only JSON.", 2048)
+        raw = self._request(
+            prompt,
+            "You are a translator. Output only JSON.",
+            2048,
+            timeout=timeout,
+        )
         parsed = _parse_structured(raw)
         if parsed and "translation" in parsed:
             return TranslationResult(

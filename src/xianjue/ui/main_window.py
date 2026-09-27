@@ -1161,11 +1161,11 @@ class MainWindow(QMainWindow):
                     base_url=config.get("base_url", ""),
                     api_format=config.get("api_format", "chat_completions"),
                 )
-                ok = provider.test_connection()
+                ok, error, latency = provider.test_connection_detailed()
             except Exception as exc:
                 error = str(exc)
+                latency = int((_time.monotonic() - start) * 1000)
 
-            latency = int((_time.monotonic() - start) * 1000)
             message = (
                 f"{self._tr('Connected')} · {latency} ms"
                 if ok
