@@ -132,7 +132,7 @@ class TestCustomCloudProvider:
         ok, error, latency_ms = provider.test_connection_detailed()
 
         assert ok is False
-        assert error == "HTTP 401 · invalid_request_error · invalid api key"
+        assert error == "HTTP 401"
         assert latency_ms >= 0
 
     def test_connection_detailed_shows_empty_response_code(self, monkeypatch):
@@ -154,7 +154,7 @@ class TestCustomCloudProvider:
         ok, error, latency_ms = provider.test_connection_detailed()
 
         assert ok is False
-        assert error == "HTTP 200 · Empty response"
+        assert error == "HTTP 200"
         assert latency_ms >= 0
 
     def test_translate_parses_structured_response(self, monkeypatch):

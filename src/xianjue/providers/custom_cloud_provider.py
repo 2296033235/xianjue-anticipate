@@ -164,14 +164,7 @@ class CustomCloudProvider(LLMProvider):
         message: str,
         fallback: str,
     ) -> str:
-        parts = [f"HTTP {status_code}"]
-        if code:
-            parts.append(code)
-        if message:
-            parts.append(message)
-        if not code and not message:
-            parts.append(fallback)
-        return " · ".join(parts)
+        return f"HTTP {status_code}"
 
     def _request(
         self,
@@ -205,7 +198,7 @@ class CustomCloudProvider(LLMProvider):
     def test_connection_detailed(self) -> tuple[bool, str, float]:
         start = time.monotonic()
         try:
-            raw = self._request("ping", None, 5, timeout=3.0).strip()
+            raw = self._request("ping", None, 128, timeout=3.0).strip()
             latency_ms = int((time.monotonic() - start) * 1000)
             return bool(raw), "" if raw else "Empty response", latency_ms
         except Exception as exc:
@@ -263,7 +256,6 @@ class CustomCloudProvider(LLMProvider):
             response = getattr(exc, "response", None)
             status_code = getattr(response, "status_code", None)
 
-        detail = str(exc).strip() or "Unknown error"
-        if status_code and f"HTTP {status_code}" not in detail:
-            detail = f"HTTP {status_code} · {detail}"
-        return detail
+        if status_code:
+            return f"HTTP {status_code}"
+        return str(exc).strip() or "Unknown error"
